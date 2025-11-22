@@ -1,7 +1,5 @@
-import dotenv from "dotenv";
-import { Wallet } from "ethers";
-
-dotenv.config();
+require("dotenv").config();
+const { Wallet } = require("ethers");
 
 if (!process.env.PRIVATE_KEY) {
   console.error("Error: PRIVATE_KEY not found in .env file");

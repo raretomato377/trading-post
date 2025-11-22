@@ -1,4 +1,4 @@
-import { Wallet } from "ethers";
+const { Wallet } = require("ethers");
 
 // Generate a new random wallet
 const wallet = Wallet.createRandom();
