@@ -24,11 +24,19 @@ async function main() {
   };
 
   const networkName = process.argv[2] || "celoSepolia";
+  const contractName = process.argv[3] || "Lock";
   const network = networks[networkName];
 
   if (!network) {
     console.error(`Unknown network: ${networkName}`);
     console.log("Available networks:", Object.keys(networks).join(", "));
+    process.exit(1);
+  }
+
+  const validContracts = ["Lock", "RandomNumbers"];
+  if (!validContracts.includes(contractName)) {
+    console.error(`Unknown contract: ${contractName}`);
+    console.log("Available contracts:", validContracts.join(", "));
     process.exit(1);
   }
 
@@ -42,45 +50,52 @@ async function main() {
   const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
   console.log(`\nDeploying to ${networkName}...`);
+  console.log("Contract:", contractName);
   console.log("Deployer address:", wallet.address);
 
   // Check balance
   const balance = await provider.getBalance(wallet.address);
   console.log("Balance:", ethers.formatEther(balance), "tokens\n");
 
-  // Get the current timestamp and add 1 year for unlock time
-  const currentTimestampInSeconds = Math.round(Date.now() / 1000);
-  const unlockTime = currentTimestampInSeconds + 365 * 24 * 60 * 60;
-
-  const lockedAmount = ethers.parseEther("0.001");
-
-  console.log("Unlock time:", new Date(unlockTime * 1000).toLocaleString());
-  console.log("Locked amount:", ethers.formatEther(lockedAmount), "tokens\n");
-
   // Read compiled contract
-  const lockArtifact = JSON.parse(
+  const contractArtifact = JSON.parse(
     fs.readFileSync(
-      path.join(__dirname, "../artifacts/contracts/Lock.sol/Lock.json"),
+      path.join(__dirname, `../artifacts/contracts/${contractName}.sol/${contractName}.json`),
       "utf8"
     )
   );
 
   // Deploy contract
   const factory = new ethers.ContractFactory(
-    lockArtifact.abi,
-    lockArtifact.bytecode,
+    contractArtifact.abi,
+    contractArtifact.bytecode,
     wallet
   );
 
-  console.log("Deploying Lock contract...");
-  const lock = await factory.deploy(unlockTime, { value: lockedAmount });
+  let contract;
+
+  if (contractName === "Lock") {
+    // Get the current timestamp and add 1 year for unlock time
+    const currentTimestampInSeconds = Math.round(Date.now() / 1000);
+    const unlockTime = currentTimestampInSeconds + 365 * 24 * 60 * 60;
+    const lockedAmount = ethers.parseEther("0.001");
+
+    console.log("Unlock time:", new Date(unlockTime * 1000).toLocaleString());
+    console.log("Locked amount:", ethers.formatEther(lockedAmount), "tokens\n");
+
+    console.log("Deploying Lock contract...");
+    contract = await factory.deploy(unlockTime, { value: lockedAmount });
+  } else if (contractName === "RandomNumbers") {
+    console.log("Deploying RandomNumbers contract...");
+    contract = await factory.deploy();
+  }
 
   console.log("Waiting for deployment...");
-  await lock.waitForDeployment();
+  await contract.waitForDeployment();
 
-  const address = await lock.getAddress();
+  const address = await contract.getAddress();
 
-  console.log(`\n✅ Lock contract deployed to: ${address}`);
+  console.log(`\n✅ ${contractName} contract deployed to: ${address}`);
   console.log(`   View on Explorer: ${network.explorer}/address/${address}\n`);
 }
 
