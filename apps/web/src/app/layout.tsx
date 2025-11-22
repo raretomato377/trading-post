@@ -10,11 +10,12 @@ const inter = Inter({ subsets: ['latin'] });
 const appUrl = process.env.NEXT_PUBLIC_URL || "http://localhost:3000";
 
 // Embed metadata for Farcaster sharing
-const frame = {
+// fc:frame is for frames, fc:miniapp is for miniapps
+const miniappMeta = {
   version: "1",
   imageUrl: `${appUrl}/opengraph-image.png`,
   button: {
-    title: "Launch farcaster-miniapp",
+    title: "Launch App",
     action: {
       type: "launch_frame",
       name: "farcaster-miniapp",
@@ -34,8 +35,8 @@ export const metadata: Metadata = {
     images: [`${appUrl}/opengraph-image.png`],
   },
   other: {
-    "fc:frame": JSON.stringify(frame),
-    "fc:miniapp": JSON.stringify({ url: appUrl }),
+    // fc:miniapp meta tag for miniapp embeds in casts
+    "fc:miniapp": JSON.stringify(miniappMeta),
   },
 };
 
