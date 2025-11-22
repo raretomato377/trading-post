@@ -4,6 +4,30 @@ This directory contains the smart contracts for farcaster-miniapp, built with Ha
 
 ## 🚀 Quick Start
 
+### Generate a new wallet
+```bash
+node scripts/generate-wallet.js
+```
+
+### Show your wallet address
+```bash
+node scripts/show-address.js
+```
+
+### Deploy to testnet
+```bash
+# Deploy to Celo Sepolia (Celo L2 testnet)
+node scripts/deploy-simple.js celoSepolia
+
+# Deploy to Alfajores testnet
+node scripts/deploy-simple.js alfajores
+
+# Deploy to Celo mainnet
+node scripts/deploy-simple.js celo
+```
+
+### Alternative: Using Hardhat Ignition
+
 ```bash
 # Install dependencies
 pnpm install
@@ -48,11 +72,11 @@ pnpm deploy:celo
 - **Explorer**: https://alfajores.celoscan.io
 - **Faucet**: https://faucet.celo.org
 
-### Sepolia Testnet
+### Sepolia Testnet (Celo L2)
 - **Chain ID**: 11142220
-- **RPC URL**: https://forno.celo-sepolia.celo-testnet.org
+- **RPC URL**: https://11142220.rpc.thirdweb.com
 - **Explorer**: https://celo-sepolia.blockscout.com
-- **Faucet**: https://faucet.celo.org/celo-sepolia
+- **Faucet**: https://faucet.celo.org
 
 ## 🔧 Environment Setup
 
@@ -67,16 +91,32 @@ pnpm deploy:celo
    CELOSCAN_API_KEY=your_celoscan_api_key
    ```
 
+### Check wallet balance
+```bash
+# Example: Check balance on Celo Sepolia
+cast balance 0xYOUR_ADDRESS --rpc-url https://11142220.rpc.thirdweb.com --ether
+
+# Or use curl
+curl -s -X POST https://11142220.rpc.thirdweb.com \
+  -H "Content-Type: application/json" \
+  --data '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0xYOUR_ADDRESS","latest"],"id":1}'
+```
+
 ## 📁 Project Structure
 
 ```
 contracts/          # Smart contract source files
 ├── Lock.sol        # Sample timelock contract
 
+scripts/           # Deployment and utility scripts
+├── deploy-simple.js    # Simple deployment script
+├── generate-wallet.js  # Generate new wallet
+└── show-address.js     # Show wallet address
+
 test/              # Contract tests
 ├── Lock.ts        # Tests for Lock contract
 
-ignition/          # Deployment scripts
+ignition/          # Hardhat Ignition deployment modules
 └── modules/
     └── Lock.ts    # Lock contract deployment
 
