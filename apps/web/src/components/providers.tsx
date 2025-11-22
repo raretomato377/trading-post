@@ -10,16 +10,16 @@ const ErudaProvider = dynamic(
 );
 
 export default function Providers({ children }: { children: React.ReactNode }) {
-  // Disable auto-add frame for localhost testing
-  // Set to true when deploying to Farcaster
-  const isFarcasterEnvironment = typeof window !== 'undefined' && 
-    (window.location.hostname.includes('farcaster') || 
-     window.location.hostname.includes('warpcast'));
+  // Check if we're on localhost - if so, disable auto-add frame
+  // Otherwise, enable it (will work in Farcaster preview tool, Warpcast, etc.)
+  const isLocalhost = typeof window !== 'undefined' && 
+    (window.location.hostname === 'localhost' || 
+     window.location.hostname === '127.0.0.1');
   
   return (
     <ErudaProvider>
       <FrameWalletProvider>
-        <MiniAppProvider addMiniAppOnLoad={isFarcasterEnvironment}>{children}</MiniAppProvider>
+        <MiniAppProvider addMiniAppOnLoad={!isLocalhost}>{children}</MiniAppProvider>
       </FrameWalletProvider>
     </ErudaProvider>
   );

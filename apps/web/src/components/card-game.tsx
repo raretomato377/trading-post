@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useReadContract } from "wagmi";
+import { useReadContract, useAccount } from "wagmi";
 import { Card } from "@/types/card";
 import { parseCards } from "@/lib/card-parser";
 import { useRoundTimer, formatTimeRemaining } from "@/hooks/use-round-timer";
 import { PredictionCard } from "./prediction-card";
 import { RANDOM_NUMBERS_CONTRACT, CELO_SEPOLIA_CHAIN_ID } from "@/config/contracts";
+import { getRandomCardNumbers } from "@/lib/mock-contract";
 
 interface CardGameProps {
   onCardsSelected?: (cards: Card[]) => void;
@@ -27,13 +28,17 @@ export function CardGame({
   const [isGenerating, setIsGenerating] = useState(false);
   
   const { currentRound, timeUntilNextRound, canGenerateCards } = useRoundTimer();
+  const { isConnected } = useAccount();
 
-  // READ from smart contract - NO transaction needed!
+  // READ from smart contract - only if wallet is connected
   const { data: contractData, isLoading, refetch } = useReadContract({
     address: RANDOM_NUMBERS_CONTRACT.address,
     abi: RANDOM_NUMBERS_CONTRACT.abi,
     functionName: 'getAllNumbers',
     chainId: CELO_SEPOLIA_CHAIN_ID,
+    query: {
+      enabled: isConnected, // Only query if wallet is connected
+    },
   });
 
   // For localhost testing, allow card generation at any time
@@ -42,46 +47,65 @@ export function CardGame({
     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
   const canGenerate = isLocalhost ? true : canGenerateCards;
 
-  // Generate cards from contract
+  // Generate cards from contract (if wallet connected) or mock (if not)
   const generateCards = async () => {
     if (isGenerating || !canGenerate) return;
     
     setIsGenerating(true);
     try {
-      // Fetch the latest data from the contract
-      const result = await refetch();
+      let numberArray: number[] = [];
+      let source = '';
 
-      if (result.data) {
-        // Convert contract numbers (uint256[4]) to numbers
-        // The contract returns: [7482, 3619, 5834, 9271]
-        const numbers = result.data as readonly bigint[];
-        const numberArray = Array.from(numbers).map(n => Number(n));
-
-        // Log to console so user can verify
-        console.log('📊 Numbers from Smart Contract:', numberArray);
-        console.log('📍 Contract Address:', RANDOM_NUMBERS_CONTRACT.address);
-
-        // Parse numbers into prediction cards using our parser framework
-        // First 4 cards use numbers from contract, rest are generated client-side
-        let numbersToParse = [...numberArray];
-        
-        // If we need more cards than contract provides, generate additional random numbers
-        if (cardCount > numberArray.length) {
-          const additionalNeeded = cardCount - numberArray.length;
-          for (let i = 0; i < additionalNeeded; i++) {
-            numbersToParse.push(Math.floor(Math.random() * 10000));
+      // Try to get numbers from contract if wallet is connected
+      if (isConnected) {
+        try {
+          const result = await refetch();
+          if (result.data) {
+            // Convert contract numbers (uint256[4]) to numbers
+            const numbers = result.data as readonly bigint[];
+            numberArray = Array.from(numbers).map(n => Number(n));
+            source = 'contract';
+            console.log('📊 Numbers from Smart Contract:', numberArray);
+            console.log('📍 Contract Address:', RANDOM_NUMBERS_CONTRACT.address);
           }
+        } catch (contractError) {
+          console.warn('⚠️ Contract call failed, falling back to mock:', contractError);
+          // Fall through to mock generation
         }
-        
-        // Parse all numbers into prediction cards
-        const finalNumbers = numbersToParse.slice(0, cardCount);
-        const parsedCards = parseCards(finalNumbers);
-        
-        setCards(parsedCards);
-        setSelectedCards([]);
-        setHasGenerated(true);
-      } else {
-        throw new Error("No data returned from contract");
+      }
+
+      // If no contract data, use mock generation
+      if (numberArray.length === 0) {
+        // Generate first 4 numbers from mock (simulating contract)
+        const mockNumbers = await getRandomCardNumbers(4);
+        numberArray = mockNumbers;
+        source = 'mock';
+        console.log('🎲 Using mock card numbers (no wallet connected):', numberArray);
+      }
+
+      // Parse numbers into prediction cards using our parser framework
+      // First 4 cards use numbers from contract/mock, rest are generated client-side
+      let numbersToParse = [...numberArray];
+      
+      // If we need more cards than contract provides, generate additional random numbers
+      if (cardCount > numberArray.length) {
+        const additionalNeeded = cardCount - numberArray.length;
+        for (let i = 0; i < additionalNeeded; i++) {
+          numbersToParse.push(Math.floor(Math.random() * 10000));
+        }
+      }
+      
+      // Parse all numbers into prediction cards
+      const finalNumbers = numbersToParse.slice(0, cardCount);
+      const parsedCards = parseCards(finalNumbers);
+      
+      setCards(parsedCards);
+      setSelectedCards([]);
+      setHasGenerated(true);
+      
+      // Show info about data source
+      if (source === 'mock' && !isLocalhost) {
+        console.log('ℹ️ Cards generated without wallet. Connect wallet to use on-chain data.');
       }
     } catch (error) {
       console.error("Failed to generate cards:", error);
@@ -138,18 +162,24 @@ export function CardGame({
       <div className="mb-8 text-center">
         <button
           onClick={generateCards}
-          disabled={isGenerating || isLoading || !canGenerate}
+          disabled={isGenerating || (isLoading && isConnected) || !canGenerate}
           className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-3 px-8 rounded-lg transition-colors duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 disabled:transform-none"
         >
-          {isGenerating || isLoading ? (
+          {isGenerating || (isLoading && isConnected) ? (
             <>
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white inline-block mr-2"></div>
-              {isLoading ? 'Loading from Contract...' : 'Generating...'}
+              {isLoading && isConnected ? 'Loading from Contract...' : 'Generating...'}
             </>
           ) : (
             <>🎴 Generate {cardCount} New Cards</>
           )}
         </button>
+        
+        {!isConnected && !isLocalhost && (
+          <p className="text-xs text-gray-500 mt-2">
+            💡 No wallet connected - using demo mode. Connect wallet for on-chain data.
+          </p>
+        )}
         
         {!canGenerate && !isLocalhost && (
           <p className="text-sm text-gray-500 mt-2">
