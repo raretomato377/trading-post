@@ -16,14 +16,17 @@ node scripts/show-address.js
 
 ### Deploy to testnet
 ```bash
-# Deploy to Celo Sepolia (Celo L2 testnet)
-node scripts/deploy-simple.js celoSepolia
+# Deploy Lock contract to Celo Sepolia (Celo L2 testnet)
+node scripts/deploy-simple.js celoSepolia Lock
+
+# Deploy RandomNumbers contract to Celo Sepolia
+node scripts/deploy-simple.js celoSepolia RandomNumbers
 
 # Deploy to Alfajores testnet
-node scripts/deploy-simple.js alfajores
+node scripts/deploy-simple.js alfajores Lock
 
 # Deploy to Celo mainnet
-node scripts/deploy-simple.js celo
+node scripts/deploy-simple.js celo Lock
 ```
 
 ### Alternative: Using Hardhat Ignition
@@ -107,9 +110,10 @@ curl -s -X POST https://11142220.rpc.thirdweb.com \
 ```
 contracts/          # Smart contract source files
 ├── Lock.sol        # Sample timelock contract
+├── RandomNumbers.sol   # Contract with hard-coded random numbers
 
 scripts/           # Deployment and utility scripts
-├── deploy-simple.js    # Simple deployment script
+├── deploy-simple.js    # Simple deployment script (supports Lock and RandomNumbers)
 ├── generate-wallet.js  # Generate new wallet
 └── show-address.js     # Show wallet address
 
