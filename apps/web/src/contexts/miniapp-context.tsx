@@ -30,14 +30,10 @@ interface MiniAppProviderProps {
 export function MiniAppProvider({ children, addMiniAppOnLoad }: MiniAppProviderProps): JSX.Element {
   const [context, setContext] = useState<FrameContext | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [hasAttemptedInit, setHasAttemptedInit] = useState(false);
   
-  // Check if we're in Farcaster environment
-  const isFarcasterEnv = typeof window !== 'undefined' && 
-    (window.location.hostname.includes('farcaster') || 
-     window.location.hostname.includes('warpcast'));
-  
-  // For localhost testing, skip SDK initialization and set ready immediately
-  const [isMiniAppReady, setIsMiniAppReady] = useState(!isFarcasterEnv);
+  // Start as not ready - we'll try to initialize SDK
+  const [isMiniAppReady, setIsMiniAppReady] = useState(false);
 
   // Set mounted state after component mounts (client-side only)
   useEffect(() => {
@@ -46,35 +42,40 @@ export function MiniAppProvider({ children, addMiniAppOnLoad }: MiniAppProviderP
 
   const setMiniAppReady = useCallback(async () => {
     try {
+      // Try to get SDK context - this will work if we're in Farcaster
       const context = await sdk.context;
       if (context) {
+        console.log("✅ Farcaster SDK context available", context);
         setContext(context);
+        // Call ready() to signal the app is loaded
+        await sdk.actions.ready();
+        console.log("✅ Called sdk.actions.ready()");
+        setIsMiniAppReady(true);
+      } else {
+        // No context means we're not in Farcaster (e.g., localhost)
+        console.log("ℹ️ No Farcaster context - running in localhost mode");
+        setIsMiniAppReady(true);
       }
-      await sdk.actions.ready();
     } catch (err) {
-      console.error("SDK initialization error:", err);
-    } finally {
+      // If SDK is not available, we're probably on localhost
+      console.log("ℹ️ Farcaster SDK not available - running in localhost mode", err);
       setIsMiniAppReady(true);
     }
   }, []);
 
   useEffect(() => {
-    // Only initialize SDK if we're in Farcaster environment
-    // For localhost, skip SDK initialization to avoid hydration issues
-    if (mounted && !isMiniAppReady && isFarcasterEnv) {
+    // Try to initialize SDK when component mounts
+    // This will work in Farcaster preview tool, Warpcast, or any Farcaster client
+    if (mounted && !hasAttemptedInit) {
+      setHasAttemptedInit(true);
       // Use requestAnimationFrame to ensure it runs after hydration
       requestAnimationFrame(() => {
         setTimeout(() => {
-          setMiniAppReady().then(() => {
-            console.log("MiniApp loaded");
-          });
+          setMiniAppReady();
         }, 100);
       });
-    } else if (!isFarcasterEnv && mounted) {
-      // For localhost, just log that we're ready
-      console.log("MiniApp ready (localhost mode)");
     }
-  }, [mounted, isMiniAppReady, isFarcasterEnv, setMiniAppReady]);
+  }, [mounted, hasAttemptedInit, setMiniAppReady]);
 
   const handleAddMiniApp = useCallback(async () => {
     try {
