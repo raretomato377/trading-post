@@ -10,10 +10,16 @@ const ErudaProvider = dynamic(
 );
 
 export default function Providers({ children }: { children: React.ReactNode }) {
+  // Disable auto-add frame for localhost testing
+  // Set to true when deploying to Farcaster
+  const isFarcasterEnvironment = typeof window !== 'undefined' && 
+    (window.location.hostname.includes('farcaster') || 
+     window.location.hostname.includes('warpcast'));
+  
   return (
     <ErudaProvider>
       <FrameWalletProvider>
-        <MiniAppProvider addMiniAppOnLoad={true}>{children}</MiniAppProvider>
+        <MiniAppProvider addMiniAppOnLoad={isFarcasterEnvironment}>{children}</MiniAppProvider>
       </FrameWalletProvider>
     </ErudaProvider>
   );

@@ -1,29 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useReadContract } from "wagmi";
+import { Card } from "@/types/card";
+import { parseCards } from "@/lib/card-parser";
+import { useRoundTimer, formatTimeRemaining } from "@/hooks/use-round-timer";
+import { PredictionCard } from "./prediction-card";
 import { RANDOM_NUMBERS_CONTRACT, CELO_SEPOLIA_CHAIN_ID } from "@/config/contracts";
 
-// Card types/suits for variety
-const CARD_SUITS = ["♠", "♥", "♦", "♣"];
-const CARD_VALUES = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
-
-interface Card {
-  suit: string;
-  value: string;
-  id: string;
-}
-
 interface CardGameProps {
-  onCardSelected?: (card: Card) => void;
-  onProceed?: (selectedCard: Card) => void;
+  onCardsSelected?: (cards: Card[]) => void;
+  onProceed?: (selectedCards: Card[]) => void;
+  maxSelections?: number; // Default: 3
+  cardCount?: number; // Number of cards to generate (default: 10, but contract returns 4)
 }
 
-export function CardGame({ onCardSelected, onProceed }: CardGameProps) {
+export function CardGame({ 
+  onCardsSelected, 
+  onProceed, 
+  maxSelections = 3,
+  cardCount = 10 
+}: CardGameProps) {
   const [cards, setCards] = useState<Card[]>([]);
-  const [selectedCard, setSelectedCard] = useState<Card | null>(null);
+  const [selectedCards, setSelectedCards] = useState<Card[]>([]);
   const [hasGenerated, setHasGenerated] = useState(false);
-  const [displayNumbers, setDisplayNumbers] = useState<number[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+  
+  const { currentRound, timeUntilNextRound, canGenerateCards } = useRoundTimer();
 
   // READ from smart contract - NO transaction needed!
   const { data: contractData, isLoading, refetch } = useReadContract({
@@ -33,155 +36,181 @@ export function CardGame({ onCardSelected, onProceed }: CardGameProps) {
     chainId: CELO_SEPOLIA_CHAIN_ID,
   });
 
-  const generateRandomCards = async () => {
-    // Fetch the latest data from the contract
-    const result = await refetch();
+  // For localhost testing, allow card generation at any time
+  // In production, this will respect the round timer
+  const isLocalhost = typeof window !== 'undefined' && 
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  const canGenerate = isLocalhost ? true : canGenerateCards;
 
-    if (result.data) {
-      // Convert contract numbers (uint256[4]) to cards
-      // The contract returns: [7482, 3619, 5834, 9271]
-      const numbers = result.data as readonly bigint[];
-      const numberArray = Array.from(numbers).map(n => Number(n));
+  // Generate cards from contract
+  const generateCards = async () => {
+    if (isGenerating || !canGenerate) return;
+    
+    setIsGenerating(true);
+    try {
+      // Fetch the latest data from the contract
+      const result = await refetch();
 
-      // Log to console so user can verify
-      console.log('📊 Numbers from Smart Contract:', numberArray);
-      console.log('📍 Contract Address:', RANDOM_NUMBERS_CONTRACT.address);
+      if (result.data) {
+        // Convert contract numbers (uint256[4]) to numbers
+        // The contract returns: [7482, 3619, 5834, 9271]
+        const numbers = result.data as readonly bigint[];
+        const numberArray = Array.from(numbers).map(n => Number(n));
 
-      // Store for display
-      setDisplayNumbers(numberArray);
+        // Log to console so user can verify
+        console.log('📊 Numbers from Smart Contract:', numberArray);
+        console.log('📍 Contract Address:', RANDOM_NUMBERS_CONTRACT.address);
 
-      const newCards: Card[] = [];
-
-      // Use first 3 numbers from contract to generate cards
-      for (let i = 0; i < Math.min(3, numbers.length); i++) {
-        const num = Number(numbers[i]);
-
-        // Use the number to deterministically select suit and value
-        const suitIndex = num % CARD_SUITS.length;
-        const valueIndex = num % CARD_VALUES.length;
-
-        const suit = CARD_SUITS[suitIndex];
-        const value = CARD_VALUES[valueIndex];
-        const cardId = `${suit}-${value}-${num}`;
-
-        newCards.push({ suit, value, id: cardId });
+        // Parse numbers into prediction cards using our parser framework
+        // First 4 cards use numbers from contract, rest are generated client-side
+        let numbersToParse = [...numberArray];
+        
+        // If we need more cards than contract provides, generate additional random numbers
+        if (cardCount > numberArray.length) {
+          const additionalNeeded = cardCount - numberArray.length;
+          for (let i = 0; i < additionalNeeded; i++) {
+            numbersToParse.push(Math.floor(Math.random() * 10000));
+          }
+        }
+        
+        // Parse all numbers into prediction cards
+        const finalNumbers = numbersToParse.slice(0, cardCount);
+        const parsedCards = parseCards(finalNumbers);
+        
+        setCards(parsedCards);
+        setSelectedCards([]);
+        setHasGenerated(true);
+      } else {
+        throw new Error("No data returned from contract");
       }
-
-      setCards(newCards);
-      setSelectedCard(null);
-      setHasGenerated(true);
+    } catch (error) {
+      console.error("Failed to generate cards:", error);
+      alert("Failed to generate cards. Please try again.");
+    } finally {
+      setIsGenerating(false);
     }
   };
 
   const handleCardClick = (card: Card) => {
-    setSelectedCard(card);
-    if (onCardSelected) {
-      onCardSelected(card);
+    const isSelected = selectedCards.some((c) => c.id === card.id);
+    
+    if (isSelected) {
+      // Deselect
+      setSelectedCards(selectedCards.filter((c) => c.id !== card.id));
+    } else {
+      // Select (if under limit)
+      if (selectedCards.length < maxSelections) {
+        const newSelection = [...selectedCards, card];
+        setSelectedCards(newSelection);
+        if (onCardsSelected) {
+          onCardsSelected(newSelection);
+        }
+      }
     }
   };
 
-  const handleProceed = () => {
-    if (selectedCard && onProceed) {
-      onProceed(selectedCard);
+  const handleProceed = async () => {
+    if (selectedCards.length === 0) return;
+    
+    // TODO: Submit selection to contract when ready
+    console.log("Proceeding with cards:", selectedCards);
+    
+    if (onProceed) {
+      onProceed(selectedCards);
     }
-  };
-
-  const getCardColor = (suit: string) => {
-    return suit === "♥" || suit === "♦" ? "text-red-600" : "text-gray-900";
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto p-6">
+    <div className="w-full max-w-6xl mx-auto p-6">
       <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold text-gray-900 mb-2">Card Game</h2>
-        <p className="text-gray-600">Generate cards and choose your favorite!</p>
+        <h2 className="text-3xl font-bold text-gray-900 mb-2">Trading Card Game</h2>
+        <p className="text-gray-600">Generate prediction cards and select your favorites!</p>
+        
+        {/* Round Timer */}
+        <div className="mt-4 inline-flex items-center gap-2 bg-white/30 backdrop-blur-sm px-4 py-2 rounded-full">
+          <span className="text-sm text-gray-700">
+            Round {currentRound} • {formatTimeRemaining(timeUntilNextRound)} remaining
+          </span>
+        </div>
       </div>
 
       {/* Generate Cards Button */}
       <div className="mb-8 text-center">
         <button
-          onClick={generateRandomCards}
-          disabled={isLoading}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-lg transition-colors duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={generateCards}
+          disabled={isGenerating || isLoading || !canGenerate}
+          className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-3 px-8 rounded-lg transition-colors duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 disabled:transform-none"
         >
-          {isLoading ? '⏳ Loading from Contract...' : '🎴 Generate Cards from Contract'}
+          {isGenerating || isLoading ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white inline-block mr-2"></div>
+              {isLoading ? 'Loading from Contract...' : 'Generating...'}
+            </>
+          ) : (
+            <>🎴 Generate {cardCount} New Cards</>
+          )}
         </button>
+        
+        {!canGenerate && !isLocalhost && (
+          <p className="text-sm text-gray-500 mt-2">
+            New cards available at the start of the next round
+          </p>
+        )}
       </div>
-
-      {/* Contract Numbers Display */}
-      {displayNumbers.length > 0 && (
-        <div className="mb-6 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
-          <p className="text-sm font-semibold text-blue-900 mb-2">
-            Numbers from Smart Contract:
-          </p>
-          <div className="flex gap-3 justify-center flex-wrap">
-            {displayNumbers.map((num, idx) => (
-              <span
-                key={idx}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md font-mono font-bold text-lg"
-              >
-                {num}
-              </span>
-            ))}
-          </div>
-          <p className="text-xs text-blue-700 mt-2">
-            Contract: {RANDOM_NUMBERS_CONTRACT.address.slice(0, 6)}...{RANDOM_NUMBERS_CONTRACT.address.slice(-4)}
-          </p>
-        </div>
-      )}
 
       {/* Cards Display */}
       {hasGenerated && cards.length > 0 && (
         <div className="mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="mb-4 text-center">
+            <p className="text-sm text-gray-600">
+              Select up to {maxSelections} cards ({selectedCards.length}/{maxSelections} selected)
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
             {cards.map((card) => {
-              const isSelected = selectedCard?.id === card.id;
+              const isSelected = selectedCards.some((c) => c.id === card.id);
+              const isDisabled = !isSelected && selectedCards.length >= maxSelections;
+              
               return (
-                <button
+                <PredictionCard
                   key={card.id}
+                  card={card}
+                  isSelected={isSelected}
                   onClick={() => handleCardClick(card)}
-                  className={`
-                    relative bg-white rounded-xl shadow-lg p-6 transition-all duration-200
-                    ${isSelected 
-                      ? 'ring-4 ring-blue-500 scale-105 shadow-2xl' 
-                      : 'hover:scale-105 hover:shadow-xl cursor-pointer'
-                    }
-                  `}
-                >
-                  {/* Card Content */}
-                  <div className={`text-center ${getCardColor(card.suit)}`}>
-                    <div className="text-5xl font-bold mb-2">{card.value}</div>
-                    <div className="text-6xl">{card.suit}</div>
-                  </div>
-
-                  {/* Selection Indicator */}
-                  {isSelected && (
-                    <div className="absolute top-2 right-2 bg-blue-500 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold">
-                      ✓
-                    </div>
-                  )}
-                </button>
+                  disabled={isDisabled}
+                />
               );
             })}
           </div>
 
-          {/* Selection Message */}
-          {selectedCard && (
+          {/* Selection Summary */}
+          {selectedCards.length > 0 && (
             <div className="mt-6 text-center">
               <p className="text-lg text-gray-700 mb-4">
-                You selected: <span className="font-bold">{selectedCard.value} {selectedCard.suit}</span>
+                You selected {selectedCards.length} card{selectedCards.length !== 1 ? 's' : ''}:
               </p>
+              <div className="flex flex-wrap justify-center gap-2 mb-4">
+                {selectedCards.map((card) => (
+                  <span
+                    key={card.id}
+                    className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium"
+                  >
+                    {card.asset.symbol}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
 
           {/* Proceed Button */}
-          {selectedCard && (
+          {selectedCards.length > 0 && (
             <div className="text-center">
               <button
                 onClick={handleProceed}
                 className="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-8 rounded-lg transition-colors duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
               >
-                ✅ Proceed with Selected Card
+                ✅ Proceed with {selectedCards.length} Selected Card{selectedCards.length !== 1 ? 's' : ''}
               </button>
             </div>
           )}
@@ -191,10 +220,10 @@ export function CardGame({ onCardSelected, onProceed }: CardGameProps) {
       {/* Instructions */}
       {!hasGenerated && (
         <div className="text-center text-gray-500 mt-8">
-          <p>Click the button above to generate 3 random cards!</p>
+          <p>Click the button above to generate {cardCount} random prediction cards!</p>
+          <p className="text-sm mt-2">Each card predicts the movement of a crypto or stock asset.</p>
         </div>
       )}
     </div>
   );
 }
-
