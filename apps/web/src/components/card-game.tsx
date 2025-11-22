@@ -51,10 +51,19 @@ export function CardGame({
   const { context: miniappContext } = useMiniApp();
   const isInFarcaster = !!miniappContext;
   
-  // Allow generation on localhost or in Farcaster (for testing), otherwise respect round timer
-  // BUT: In Farcaster, require wallet connection
-  const canGenerateByTimer = isLocalhost || isInFarcaster ? true : canGenerateCards;
-  const canGenerate = canGenerateByTimer && (!isInFarcaster || isConnected);
+  // Generation rules:
+  // - Localhost: always allow (testing)
+  // - Farcaster: require wallet + allow anytime (testing)
+  // - Web (not Farcaster): allow without wallet anytime (demo mode), or with wallet respect round timer
+  let canGenerate: boolean;
+  if (isLocalhost) {
+    canGenerate = true; // Always allow on localhost
+  } else if (isInFarcaster) {
+    canGenerate = isConnected; // In Farcaster, require wallet
+  } else {
+    // On web (not Farcaster): allow without wallet anytime, or with wallet respect timer
+    canGenerate = !isConnected ? true : canGenerateCards;
+  }
 
   // Generate cards from contract (if wallet connected) or mock (if not)
   const generateCards = async () => {
@@ -190,7 +199,13 @@ export function CardGame({
           </p>
         )}
         
-        {!isConnected && !isLocalhost && !isInFarcaster && (
+        {!canGenerate && !isInFarcaster && !isLocalhost && (
+          <p className="text-sm text-gray-500 mt-2">
+            New cards available at the start of the next round (first 30 minutes of each hour)
+          </p>
+        )}
+        
+        {canGenerate && !isConnected && !isLocalhost && !isInFarcaster && (
           <p className="text-xs text-gray-500 mt-2">
             💡 No wallet connected - using demo mode. Connect wallet for on-chain data.
           </p>
