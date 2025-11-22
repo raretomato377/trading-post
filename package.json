@@ -25,5 +25,10 @@
   "engines": {
     "node": ">=18.0.0",
     "pnpm": ">=8.0.0"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.90.10",
+    "viem": "^2.39.3",
+    "wagmi": "^3.0.1"
   }
 }
