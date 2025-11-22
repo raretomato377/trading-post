@@ -26,10 +26,16 @@ export default function Home() {
     (window.location.hostname === 'localhost' || 
      window.location.hostname === '127.0.0.1');
   
-  // Auto-connect wallet when miniapp is ready (skip on localhost)
+  // Only auto-connect if we have Farcaster context (actually in Farcaster environment)
+  const hasFarcasterContext = !!context;
+  
+  // Auto-connect wallet when miniapp is ready (only if in Farcaster)
   useEffect(() => {
-    // Only auto-connect if not on localhost (works in Farcaster preview tool, Warpcast, etc.)
-    if (isLocalhost) {
+    // Only auto-connect if:
+    // 1. Not on localhost
+    // 2. MiniApp is ready
+    // 3. We have Farcaster context (actually in Farcaster/Warpcast)
+    if (isLocalhost || !hasFarcasterContext) {
       return;
     }
     
@@ -61,7 +67,7 @@ export default function Home() {
         console.warn('⚠️ Farcaster connector not found. Available connectors:', connectors.map(c => ({ id: c.id, name: c.name })));
       }
     }
-  }, [mounted, isMiniAppReady, isConnected, isConnecting, connectors, connect, isLocalhost]);
+  }, [mounted, isMiniAppReady, isConnected, isConnecting, connectors, connect, isLocalhost, hasFarcasterContext, context]);
   
   // Extract user data from context
   const user = context?.user;
