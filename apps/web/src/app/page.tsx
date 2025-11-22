@@ -21,8 +21,18 @@ export default function Home() {
   const { connect, connectors } = useConnect();
   const hasAttemptedConnectRef = useRef(false);
   
+  // Check if we're in Farcaster environment
+  const isFarcasterEnv = typeof window !== 'undefined' && 
+    (window.location.hostname.includes('farcaster') || 
+     window.location.hostname.includes('warpcast'));
+  
   // Auto-connect wallet when miniapp is ready (only in Farcaster)
   useEffect(() => {
+    // Only auto-connect in Farcaster environment, not localhost
+    if (!isFarcasterEnv) {
+      return;
+    }
+    
     if (
       mounted &&
       isMiniAppReady && 
@@ -31,17 +41,27 @@ export default function Home() {
       !hasAttemptedConnectRef.current && 
       connectors.length > 0
     ) {
-      const farcasterConnector = connectors.find(c => c.id === 'farcaster');
+      // Try to find the Farcaster connector
+      // The connector ID might be 'farcaster' or something else
+      const farcasterConnector = connectors.find(c => 
+        c.id === 'farcaster' || 
+        c.id === 'farcasterMiniApp' ||
+        c.name?.toLowerCase().includes('farcaster')
+      );
+      
       if (farcasterConnector) {
+        console.log('🔗 Auto-connecting to Farcaster wallet...', farcasterConnector.id);
         hasAttemptedConnectRef.current = true;
         requestAnimationFrame(() => {
           setTimeout(() => {
             connect({ connector: farcasterConnector });
           }, 200);
         });
+      } else {
+        console.warn('⚠️ Farcaster connector not found. Available connectors:', connectors.map(c => ({ id: c.id, name: c.name })));
       }
     }
-  }, [mounted, isMiniAppReady, isConnected, isConnecting, connectors, connect]);
+  }, [mounted, isMiniAppReady, isConnected, isConnecting, connectors, connect, isFarcasterEnv]);
   
   // Extract user data from context
   const user = context?.user;
@@ -90,6 +110,23 @@ export default function Home() {
                 <span className="text-sm text-gray-700">
                   {displayName}
                 </span>
+              </div>
+            </div>
+          )}
+
+          {/* Wallet Connection Status - Only show in Farcaster */}
+          {isFarcasterEnv && (
+            <div className="text-center">
+              <div className="inline-flex items-center gap-2 bg-white/30 backdrop-blur-sm px-4 py-2 rounded-full">
+                {isConnecting ? (
+                  <span className="text-sm text-gray-600">Connecting wallet...</span>
+                ) : isConnected && address ? (
+                  <span className="text-sm text-gray-700">
+                    Wallet: {address.slice(0, 6)}...{address.slice(-4)}
+                  </span>
+                ) : (
+                  <span className="text-sm text-yellow-600">Wallet not connected</span>
+                )}
               </div>
             </div>
           )}
