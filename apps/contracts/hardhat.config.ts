@@ -24,9 +24,9 @@ const config: HardhatUserConfig = {
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 44787,
     },
-    // Celo Sepolia Testnet
+    // Celo Sepolia Testnet (L2)
     sepolia: {
-      url: "https://forno.celo-sepolia.celo-testnet.org",
+      url: "https://11142220.rpc.thirdweb.com",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 11142220,
     },
