@@ -35,6 +35,7 @@ export const metadata: Metadata = {
   },
   other: {
     "fc:frame": JSON.stringify(frame),
+    "fc:miniapp": JSON.stringify({ url: appUrl }),
   },
 };
 
