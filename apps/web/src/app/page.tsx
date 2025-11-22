@@ -120,8 +120,8 @@ export default function Home() {
             </div>
           )}
 
-          {/* Wallet Connection Status - Show when not on localhost */}
-          {!isLocalhost && (
+          {/* Wallet Connection Status - Only show in Farcaster */}
+          {hasFarcasterContext && (
             <div className="text-center">
               <div className="inline-flex items-center gap-2 bg-white/30 backdrop-blur-sm px-4 py-2 rounded-full">
                 {isConnecting ? (
