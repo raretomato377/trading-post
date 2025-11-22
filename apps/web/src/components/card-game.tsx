@@ -8,6 +8,7 @@ import { useRoundTimer, formatTimeRemaining } from "@/hooks/use-round-timer";
 import { PredictionCard } from "./prediction-card";
 import { RANDOM_NUMBERS_CONTRACT, CELO_SEPOLIA_CHAIN_ID } from "@/config/contracts";
 import { getRandomCardNumbers } from "@/lib/mock-contract";
+import { useMiniApp } from "@/contexts/miniapp-context";
 
 interface CardGameProps {
   onCardsSelected?: (cards: Card[]) => void;
@@ -41,11 +42,19 @@ export function CardGame({
     },
   });
 
-  // For localhost testing, allow card generation at any time
+  // For localhost and Farcaster testing, allow card generation at any time
   // In production, this will respect the round timer
   const isLocalhost = typeof window !== 'undefined' && 
     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-  const canGenerate = isLocalhost ? true : canGenerateCards;
+  
+  // Check if we're in Farcaster (has context means we're in Farcaster/Warpcast)
+  const { context: miniappContext } = useMiniApp();
+  const isInFarcaster = !!miniappContext;
+  
+  // Allow generation on localhost or in Farcaster (for testing), otherwise respect round timer
+  // BUT: In Farcaster, require wallet connection
+  const canGenerateByTimer = isLocalhost || isInFarcaster ? true : canGenerateCards;
+  const canGenerate = canGenerateByTimer && (!isInFarcaster || isConnected);
 
   // Generate cards from contract (if wallet connected) or mock (if not)
   const generateCards = async () => {
@@ -175,7 +184,13 @@ export function CardGame({
           )}
         </button>
         
-        {!isConnected && !isLocalhost && (
+        {!canGenerate && isInFarcaster && !isConnected && (
+          <p className="text-sm text-yellow-600 mt-2">
+            ⚠️ Wallet required in Farcaster. Please connect your wallet to generate cards.
+          </p>
+        )}
+        
+        {!isConnected && !isLocalhost && !isInFarcaster && (
           <p className="text-xs text-gray-500 mt-2">
             💡 No wallet connected - using demo mode. Connect wallet for on-chain data.
           </p>
