@@ -23,12 +23,18 @@ git push origin main
 2. Import your GitHub repository
 3. Configure the project:
    - **Framework Preset**: Next.js (or Auto-detect)
-   - **Root Directory**: `apps/web` (IMPORTANT: This must be set!)
-   - **Build Command**: `pnpm --filter web build` (or leave default if vercel.json is present)
-   - **Install Command**: `pnpm install` (or leave default)
-   - **Output Directory**: `apps/web/.next` (or leave default if vercel.json is present)
+   - **Root Directory**: `apps/web` ⚠️ **CRITICAL: This MUST be set!**
+   - **Build Command**: Leave as default (Next.js will auto-detect)
+   - **Install Command**: `pnpm install` (or leave as default)
+   - **Output Directory**: Leave as default (`.next`)
    
-   **Note**: The `vercel.json` file in the root should automatically configure these settings. If Vercel still can't detect Next.js, manually set the Root Directory to `apps/web` in the dashboard.
+   **IMPORTANT**: 
+   - The Root Directory setting is the most critical - it tells Vercel where your `package.json` with Next.js is located
+   - After setting Root Directory to `apps/web`, Vercel should automatically detect Next.js from `apps/web/package.json`
+   - If you still get "No Next.js version detected", double-check:
+     1. Root Directory is exactly `apps/web` (not `apps/web/` with trailing slash)
+     2. The `apps/web/package.json` file exists and has `"next"` in dependencies
+     3. Try redeploying after setting the Root Directory
 
 ### Option B: Via Vercel CLI
 
