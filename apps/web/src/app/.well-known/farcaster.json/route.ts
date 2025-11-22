@@ -1,15 +1,12 @@
-import { getFarcasterManifest } from "@/lib/warpcast";
 import { NextResponse } from "next/server";
 
+// Farcaster Hosted Manifest URL
+const FARCASTER_HOSTED_MANIFEST_URL = "https://api.farcaster.xyz/miniapps/hosted-manifest/019aad21-bb42-c435-55cf-f02d34294587";
+
 export async function GET() {
-  try {
-    const manifest = await getFarcasterManifest();
-    return NextResponse.json(manifest);
-  } catch (error) {
-    console.error("Error generating manifest:", error);
-    return NextResponse.json(
-      { error: (error as Error).message },
-      { status: 500 }
-    );
-  }
+  // Temporarily redirect (307) to Farcaster hosted manifest
+  // 307 is a temporary redirect that preserves the HTTP method
+  return NextResponse.redirect(FARCASTER_HOSTED_MANIFEST_URL, {
+    status: 307,
+  });
 }
