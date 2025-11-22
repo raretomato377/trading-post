@@ -8,6 +8,8 @@ import { env } from "@/lib/env";
 export async function getFarcasterManifest() {
   const frameName = "farcaster-miniapp";
   const appUrl = env.NEXT_PUBLIC_URL;
+  // Only set noindex for localhost/dev environments, NOT for production
+  // Production domains should have noindex: false (or omit it)
   const noindex = appUrl.includes("localhost") || appUrl.includes("ngrok") || appUrl.includes("https://dev.");
 
   // Check if account association is properly configured
@@ -64,7 +66,9 @@ export async function getFarcasterManifest() {
         `${appUrl}/opengraph-image.png`,
       ],
       heroImageUrl: `${appUrl}/opengraph-image.png`, // 1200 x 630px (1.91:1), promotional display image on top of the mini app store
-      noindex,
+      // Only include noindex if true (for dev environments)
+      // For production, omit it or set to false
+      ...(noindex && { noindex: true }),
     },
   };
 }
