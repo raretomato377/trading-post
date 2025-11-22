@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useReadContract } from "wagmi";
+import { RANDOM_NUMBERS_CONTRACT, CELO_SEPOLIA_CHAIN_ID } from "@/config/contracts";
 
 // Card types/suits for variety
 const CARD_SUITS = ["♠", "♥", "♦", "♣"];
@@ -21,25 +23,54 @@ export function CardGame({ onCardSelected, onProceed }: CardGameProps) {
   const [cards, setCards] = useState<Card[]>([]);
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [hasGenerated, setHasGenerated] = useState(false);
+  const [displayNumbers, setDisplayNumbers] = useState<number[]>([]);
 
-  const generateRandomCards = () => {
-    const newCards: Card[] = [];
-    const usedCards = new Set<string>();
+  // READ from smart contract - NO transaction needed!
+  const { data: contractData, isLoading, refetch } = useReadContract({
+    address: RANDOM_NUMBERS_CONTRACT.address,
+    abi: RANDOM_NUMBERS_CONTRACT.abi,
+    functionName: 'getAllNumbers',
+    chainId: CELO_SEPOLIA_CHAIN_ID,
+  });
 
-    while (newCards.length < 3) {
-      const suit = CARD_SUITS[Math.floor(Math.random() * CARD_SUITS.length)];
-      const value = CARD_VALUES[Math.floor(Math.random() * CARD_VALUES.length)];
-      const cardId = `${suit}-${value}`;
+  const generateRandomCards = async () => {
+    // Fetch the latest data from the contract
+    const result = await refetch();
 
-      if (!usedCards.has(cardId)) {
-        usedCards.add(cardId);
+    if (result.data) {
+      // Convert contract numbers (uint256[4]) to cards
+      // The contract returns: [7482, 3619, 5834, 9271]
+      const numbers = result.data as readonly bigint[];
+      const numberArray = Array.from(numbers).map(n => Number(n));
+
+      // Log to console so user can verify
+      console.log('📊 Numbers from Smart Contract:', numberArray);
+      console.log('📍 Contract Address:', RANDOM_NUMBERS_CONTRACT.address);
+
+      // Store for display
+      setDisplayNumbers(numberArray);
+
+      const newCards: Card[] = [];
+
+      // Use first 3 numbers from contract to generate cards
+      for (let i = 0; i < Math.min(3, numbers.length); i++) {
+        const num = Number(numbers[i]);
+
+        // Use the number to deterministically select suit and value
+        const suitIndex = num % CARD_SUITS.length;
+        const valueIndex = num % CARD_VALUES.length;
+
+        const suit = CARD_SUITS[suitIndex];
+        const value = CARD_VALUES[valueIndex];
+        const cardId = `${suit}-${value}-${num}`;
+
         newCards.push({ suit, value, id: cardId });
       }
-    }
 
-    setCards(newCards);
-    setSelectedCard(null);
-    setHasGenerated(true);
+      setCards(newCards);
+      setSelectedCard(null);
+      setHasGenerated(true);
+    }
   };
 
   const handleCardClick = (card: Card) => {
@@ -70,11 +101,34 @@ export function CardGame({ onCardSelected, onProceed }: CardGameProps) {
       <div className="mb-8 text-center">
         <button
           onClick={generateRandomCards}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-lg transition-colors duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+          disabled={isLoading}
+          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-lg transition-colors duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          🎴 Generate Random Cards
+          {isLoading ? '⏳ Loading from Contract...' : '🎴 Generate Cards from Contract'}
         </button>
       </div>
+
+      {/* Contract Numbers Display */}
+      {displayNumbers.length > 0 && (
+        <div className="mb-6 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+          <p className="text-sm font-semibold text-blue-900 mb-2">
+            Numbers from Smart Contract:
+          </p>
+          <div className="flex gap-3 justify-center flex-wrap">
+            {displayNumbers.map((num, idx) => (
+              <span
+                key={idx}
+                className="bg-blue-600 text-white px-4 py-2 rounded-md font-mono font-bold text-lg"
+              >
+                {num}
+              </span>
+            ))}
+          </div>
+          <p className="text-xs text-blue-700 mt-2">
+            Contract: {RANDOM_NUMBERS_CONTRACT.address.slice(0, 6)}...{RANDOM_NUMBERS_CONTRACT.address.slice(-4)}
+          </p>
+        </div>
+      )}
 
       {/* Cards Display */}
       {hasGenerated && cards.length > 0 && (
