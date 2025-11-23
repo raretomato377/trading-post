@@ -1,5 +1,6 @@
 import type { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox-viem";
+import "dotenv/config";
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -43,11 +44,8 @@ const config: HardhatUserConfig = {
     },
   },
   etherscan: {
-    apiKey: {
-      celo: process.env.CELOSCAN_API_KEY || "",
-      alfajores: process.env.CELOSCAN_API_KEY || "",
-      sepolia: process.env.CELOSCAN_API_KEY || "",
-    },
+    // Etherscan v2 API - single key works for all Etherscan-compatible chains
+    apiKey: process.env.ETHERSCAN_API_KEY || "",
     customChains: [
       {
         network: "celo",
