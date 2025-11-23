@@ -139,18 +139,21 @@ export async function GET(request: NextRequest) {
     
     // Only compute phase if game is not explicitly ENDED
     if (computedStatus !== 4) { // 4 = ENDED
-      // If cards haven't been generated, game is still in LOBBY (waiting for startGame to be called)
-      if (cardCount === 0n) {
+      // Priority: If we're past choice deadline, we MUST be in RESOLUTION (cards must exist)
+      // This prevents flickering between LOBBY and RESOLUTION
+      if (currentTime >= choiceDeadline && currentTime < resolutionDeadline) {
+        computedStatus = 3; // RESOLUTION
+      } else if (currentTime >= resolutionDeadline) {
+        computedStatus = 3; // Still RESOLUTION until endGame is called
+      } else if (cardCount === 0n && currentTime >= lobbyDeadline) {
+        // Cards not generated but lobby deadline passed - stay in LOBBY (waiting for startGame)
+        computedStatus = 0; // LOBBY - waiting for startGame
+      } else if (cardCount === 0n && currentTime < lobbyDeadline) {
         computedStatus = 0; // LOBBY - waiting for startGame
       } else if (currentTime < lobbyDeadline) {
         computedStatus = 0; // LOBBY
       } else if (currentTime < choiceDeadline) {
         computedStatus = 2; // CHOICE
-      } else if (currentTime < resolutionDeadline) {
-        computedStatus = 3; // RESOLUTION
-      } else {
-        // Resolution deadline passed, but game not ended yet
-        computedStatus = 3; // Still RESOLUTION until endGame is called
       }
     }
 

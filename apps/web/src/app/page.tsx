@@ -87,12 +87,18 @@ export default function Home() {
   // Get player's active game from contract - THIS IS THE SOURCE OF TRUTH
   const { activeGameId: currentGameId, isChecking: isCheckingActiveGame } = usePlayerActiveGame(address);
 
+  // State to track the ended game ID (so we can show results even after playerActiveGame is cleared)
+  const [endedGameId, setEndedGameId] = useState<bigint | undefined>(undefined);
+  
   // State to track if we're showing results (to stop polling)
   const [showingResults, setShowingResults] = useState(false);
 
+  // Determine which gameId to use: current active game, or ended game if we're showing results
+  const gameIdForState = showingResults && endedGameId ? endedGameId : currentGameId;
+
   // Get current game state to determine what to show
   // Don't poll when showing results
-  const { gameState, isLoading: isLoadingGameState } = useGameState(showingResults ? undefined : currentGameId);
+  const { gameState, isLoading: isLoadingGameState } = useGameState(showingResults ? undefined : gameIdForState);
   
   // Debug: Log game state fetching
   useEffect(() => {
@@ -120,22 +126,36 @@ export default function Home() {
   
   const hasActiveGame = activeGameId !== undefined && activeGameId > 0n; // Player is in a game
   
-  // Only show lobby if player has NO active game at all
-  const showLobby = !hasActiveGame && !isCheckingActiveGame;
+  // Only show lobby if player has NO active game at all AND we're not showing results
+  const showLobby = !hasActiveGame && !isCheckingActiveGame && !showingResults && !endedGameId;
   // Show game if player has an active game that's not ended (including LOBBY state)
   // Also show game if gameState is still loading (we know they're in a game)
-  const showGame = hasActiveGame && (!gameState || gameState.status !== GameStatus.ENDED);
-  // Show results if player's game has ended
-  const showResults = hasActiveGame && gameState?.status === GameStatus.ENDED;
+  // Don't show game if we're showing results
+  const showGame = hasActiveGame && (!gameState || gameState.status !== GameStatus.ENDED) && !showingResults;
+  // Show results if player's game has ended OR if we have an ended game ID stored
+  const showResults = (hasActiveGame && gameState?.status === GameStatus.ENDED) || 
+                      (endedGameId !== undefined);
   
-  // Update showingResults state when results should be shown
+  // Track when a game ends so we can continue showing results even after playerActiveGame is cleared
   useEffect(() => {
-    setShowingResults(showResults);
-  }, [showResults]);
+    if (gameState?.status === GameStatus.ENDED && gameIdForState) {
+      // Store the ended game ID so we can continue showing results
+      setEndedGameId(gameIdForState);
+      setShowingResults(true);
+    } else if (gameState?.status !== GameStatus.ENDED && endedGameId) {
+      // Clear ended game ID if we're no longer in an ended game
+      // (e.g., user created a new game)
+      if (!currentGameId || currentGameId === 0n) {
+        setEndedGameId(undefined);
+        setShowingResults(false);
+      }
+    }
+  }, [gameState?.status, gameIdForState, endedGameId, currentGameId]);
   
   // Handle back from results - clear the showing results state and refresh
   const handleBackFromResults = () => {
     setShowingResults(false);
+    setEndedGameId(undefined);
     // Force a refresh to get the latest active game state
     window.location.reload();
   };
@@ -238,7 +258,7 @@ export default function Home() {
           )}
 
           {/* Results Display - Show when game has ended */}
-          {showResults && <ResultsDisplay gameId={activeGameId} onBack={handleBackFromResults} />}
+          {showResults && <ResultsDisplay gameId={endedGameId || activeGameId} onBack={handleBackFromResults} />}
 
           {/* Leaderboard - Always show */}
           <Leaderboard limit={10} />

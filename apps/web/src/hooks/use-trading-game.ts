@@ -996,7 +996,7 @@ export function usePredictionResult(gameId: bigint | undefined, cardNumber: bigi
  * Hook to read player score
  */
 export function usePlayerScore(playerAddress: `0x${string}` | undefined) {
-  const { data, isLoading, error } = useReadContract({
+  const { data, isLoading, error, refetch } = useReadContract({
     address: TRADING_CARD_GAME_CONTRACT.address,
     abi: TRADING_CARD_GAME_CONTRACT.abi,
     functionName: "getPlayerScore",
@@ -1004,6 +1004,8 @@ export function usePlayerScore(playerAddress: `0x${string}` | undefined) {
     chainId: CELO_MAINNET_CHAIN_ID,
     query: {
       enabled: !!playerAddress,
+      // Poll every 5 seconds to get updated scores after endGame
+      refetchInterval: 5000,
     },
   });
 
@@ -1019,6 +1021,7 @@ export function usePlayerScore(playerAddress: `0x${string}` | undefined) {
     score,
     isLoading,
     error,
+    refetch, // Expose refetch so components can manually refresh scores
   };
 }
 

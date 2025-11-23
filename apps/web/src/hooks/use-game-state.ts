@@ -255,6 +255,7 @@ export function useGameStateManager(gameId: bigint | undefined, disablePolling: 
   }, [fetchGameData]);
 
   // Show start game button when lobby deadline has passed but cards haven't been generated
+  // Only show if we're actually in LOBBY status (not RESOLUTION or ENDED)
   const showStartGameButton = 
     address &&
     gameState?.status === GameStatus.LOBBY &&
