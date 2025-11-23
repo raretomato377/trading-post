@@ -14,7 +14,7 @@ contract TradingCardGame {
 
     uint256 public constant LOBBY_DURATION = 60 seconds; // 60 seconds to join
     uint256 public constant CHOICE_DURATION = 60 seconds; // 1 minute to commit choices
-    uint256 public constant RESOLUTION_DURATION = 600 seconds; // 10 minutes for price resolution
+    uint256 public constant RESOLUTION_DURATION = 180 seconds; // 3 minutes for price resolution
     uint256 public constant MIN_PLAYERS = 2; // Minimum players to start game
 
     // Difficulty-based point values
@@ -242,13 +242,40 @@ contract TradingCardGame {
      * @dev This function is kept for backwards compatibility but does nothing
      *      Cards are automatically generated when first player commits choices
      */
+    /**
+     * @notice Start the game and generate cards
+     * @param _gameId The game ID
+     * @param _useSecureRandomness If true, uses secure randomness (placeholder for Pyth randomness). If false, uses block-based randomness.
+     * @dev Can be called by anyone after lobby deadline. Generates cards and transitions to CHOICE phase.
+     */
     function startGame(
         uint256 _gameId,
         bool _useSecureRandomness
     ) external validGame(_gameId) {
-        // Cards are now generated lazily in commitChoices
-        // This function is a no-op for backwards compatibility
-        // The _useSecureRandomness parameter is ignored
+        Game storage game = games[_gameId];
+        
+        // Validate lobby deadline has passed
+        require(
+            block.timestamp >= game.lobbyDeadline,
+            "Lobby phase not ended yet"
+        );
+        
+        // Validate we haven't passed choice deadline yet
+        require(
+            block.timestamp < game.choiceDeadline,
+            "Choice deadline already passed"
+        );
+        
+        // Validate cards haven't been generated yet
+        require(game.cards.length == 0, "Cards already generated");
+        
+        // Generate cards
+        _generateCards(_gameId, _useSecureRandomness);
+        
+        // Update status to CHOICE
+        game.status = GameStatus.CHOICE;
+        
+        emit GameActive(_gameId, game.cards);
     }
 
     /**
@@ -277,14 +304,16 @@ contract TradingCardGame {
      * @notice Commit player's 3 selected cards
      * @param _gameId The game ID
      * @param _cardNumbers Array of 3 card numbers (4-digit numbers from game.cards)
-     * @dev Automatically generates cards if not already generated (lazy generation)
-     *      Validates that we're in CHOICE phase based on timestamps
+     * @dev Validates that cards have been generated (game must be started) and we're in CHOICE phase
      */
     function commitChoices(
         uint256 _gameId,
         uint256[3] memory _cardNumbers
     ) external validGame(_gameId) {
         Game storage game = games[_gameId];
+        
+        // Validate cards have been generated (game must be started)
+        require(game.cards.length > 0, "Game not started yet - cards not generated");
         
         // Validate we're in CHOICE phase based on timestamps
         require(
@@ -295,14 +324,6 @@ contract TradingCardGame {
             block.timestamp < game.choiceDeadline,
             "Choice deadline passed"
         );
-        
-        // Auto-generate cards if not already generated (lazy generation)
-        if (game.cards.length == 0) {
-            // Generate cards using insecure randomness (can be upgraded later)
-            _generateCards(_gameId, false);
-            game.status = GameStatus.CHOICE; // Update status for consistency
-            emit GameActive(_gameId, game.cards);
-        }
         
         require(!game.choices[msg.sender].committed, "Already committed");
 

@@ -52,8 +52,10 @@ export function CardGame({ gameId, maxSelections = 3, onChoicesCommitted }: Card
     }
   }, [commitSuccess, onChoicesCommitted]);
 
-  // Only show cards when game is in CHOICE state (cards are auto-generated when game starts)
-  const canShowCards = gameState?.status === GameStatus.CHOICE;
+  // Show cards when game is in CHOICE state OR when player has committed (to show their selections in resolution)
+  // After committing, visually transition to resolution phase even if game state is still CHOICE
+  const canShowCards = gameState?.status === GameStatus.CHOICE || (hasCommitted && gameState?.status !== GameStatus.ENDED);
+  const isInResolutionPhase = hasCommitted || gameState?.status === GameStatus.RESOLUTION;
 
   const handleCardClick = (card: Card) => {
     // Don't allow changes if already committed
@@ -110,7 +112,8 @@ export function CardGame({ gameId, maxSelections = 3, onChoicesCommitted }: Card
       );
     }
 
-    if (gameState.status === GameStatus.RESOLUTION) {
+    // Show resolution phase if game is in RESOLUTION OR if player has committed (visual transition)
+    if (isInResolutionPhase) {
       // Show player's selected cards if they committed
       const playerSelectedCards = playerChoice?.committed && playerChoice.selectedCards
         ? playerChoice.selectedCards.map((cardNum) => {
@@ -122,11 +125,21 @@ export function CardGame({ gameId, maxSelections = 3, onChoicesCommitted }: Card
       return (
         <div className="w-full max-w-6xl mx-auto p-6">
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Waiting for Resolution</h2>
-            <p className="text-lg text-purple-800 mb-4">Waiting for price resolution...</p>
-            <p className="text-sm text-purple-600 mb-6">
-              Time remaining: {formatTimeRemaining(resolutionTimeRemaining)}
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">
+              {hasCommitted && gameState?.status === GameStatus.CHOICE 
+                ? "Choices Committed - Waiting for Resolution"
+                : "Waiting for Resolution"}
+            </h2>
+            <p className="text-lg text-purple-800 mb-4">
+              {hasCommitted && gameState?.status === GameStatus.CHOICE
+                ? "Your choices are committed. Waiting for choice phase to end..."
+                : "Waiting for price resolution..."}
             </p>
+            {gameState?.status === GameStatus.RESOLUTION && (
+              <p className="text-sm text-purple-600 mb-6">
+                Time remaining: {formatTimeRemaining(resolutionTimeRemaining)}
+              </p>
+            )}
             
             {/* Show player's committed choices */}
             {playerSelectedCards.length > 0 && (

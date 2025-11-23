@@ -17,10 +17,14 @@ export function GameStatusDisplay({ gameId }: GameStatusProps) {
   const {
     gameState,
     players,
+    cards,
     lobbyTimeRemaining,
     choiceTimeRemaining,
     resolutionTimeRemaining,
     isLoading,
+    showStartGameButton,
+    manualStartGame,
+    isStartingGame,
     showEndGameButton,
     manualEndGame,
     isEndingGame,
@@ -177,6 +181,23 @@ export function GameStatusDisplay({ gameId }: GameStatusProps) {
         <div className="mt-4 pt-4 border-t border-current border-opacity-20">
           <p className="text-sm font-semibold">Game Complete</p>
           <p className="text-xs opacity-75">Check results to see your score!</p>
+        </div>
+      )}
+
+      {/* Start game button - only show when lobby deadline has passed but cards not generated */}
+      {showStartGameButton && (
+        <div className="mt-4 pt-4 border-t border-current border-opacity-20">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+            <p className="text-sm font-semibold text-blue-800 mb-1">⏰ Lobby Phase Complete</p>
+            <p className="text-xs text-blue-700">The lobby deadline has passed. Click below to start the game and generate cards.</p>
+          </div>
+          <button
+            onClick={manualStartGame}
+            disabled={isStartingGame}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-3 px-4 rounded-lg transition-colors duration-200 text-sm shadow-lg hover:shadow-xl"
+          >
+            {isStartingGame ? "Starting Game..." : "🎮 Start Game & Generate Cards"}
+          </button>
         </div>
       )}
 

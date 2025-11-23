@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useAccount } from "wagmi";
 import {
   useEndGame,
+  useStartGame,
   GameStatus,
   type GameState,
   type PlayerChoice,
@@ -215,11 +216,21 @@ export function useGameStateManager(gameId: bigint | undefined) {
   // Check if player has committed choices
   const hasCommitted = playerChoice?.committed ?? false;
 
-  // Phases are now determined by timestamps automatically
-  // No need for startGame or transitionToResolution - cards are generated lazily in commitChoices
+  // Start game logic - users manually call startGame when lobby deadline passes
+  const { startGame, isPending: isStartingGame } = useStartGame(normalizedGameId, false);
+  
+  // Manual function to start game (called by user when lobby deadline passes)
+  const manualStartGame = useCallback(() => {
+    if (!normalizedGameId) return;
+    if (!address) {
+      alert('Please connect your wallet first');
+      return;
+    }
+    startGame(false);
+  }, [normalizedGameId, address, startGame]);
 
   // End game logic - users manually call endGame when resolution deadline passes
-  const { endGame, isPending: isEndingGame } = useEndGame(gameId);
+  const { endGame, isPending: isEndingGame } = useEndGame(normalizedGameId);
   
   // Manual function to end game (called by user when resolution deadline passes)
   const manualEndGame = useCallback(() => {
@@ -236,12 +247,17 @@ export function useGameStateManager(gameId: bigint | undefined) {
     fetchGameData();
   }, [fetchGameData]);
 
+  // Show start game button when lobby deadline has passed but cards haven't been generated
+  const showStartGameButton = 
+    address &&
+    gameState?.status === GameStatus.LOBBY &&
+    gameState.lobbyDeadline &&
+    gameState.lobbyDeadline > 0n &&
+    lobbyTimeRemaining <= 0 &&
+    (!cards || cards.length === 0) && // Cards not generated yet
+    !isStartingGame;
+
   // Show end game button when resolution deadline has passed
-  // Check both the stored status and computed phase (in case status hasn't updated)
-  const computedPhase = gameState?.resolutionDeadline 
-    ? (resolutionTimeRemaining <= 0 ? GameStatus.RESOLUTION : GameStatus.RESOLUTION)
-    : undefined;
-  
   const showEndGameButton = 
     address &&
     gameState?.status === GameStatus.RESOLUTION &&
@@ -279,6 +295,12 @@ export function useGameStateManager(gameId: bigint | undefined) {
     isPlayerInGame,
     hasCommitted,
     refetch,
+    // Manual function to start game
+    manualStartGame,
+    // Flag for showing start game button
+    showStartGameButton,
+    // Loading state for starting game
+    isStartingGame,
     // Manual function to end game
     manualEndGame,
     // Flag for showing end game button
