@@ -19,12 +19,12 @@ async function main() {
   // Load contract ABI
   const contractArtifact = JSON.parse(
     fs.readFileSync(
-      path.join(__dirname, "../artifacts/contracts/HyperlaneReceiver.sol/HyperlaneReceiver.json"),
+      path.join(__dirname, "../artifacts/contracts/HyperlaneCelo.sol/HyperlaneCelo.json"),
       "utf8"
     )
   );
 
-  // Connect to HyperlaneReceiver contract (read-only)
+  // Connect to HyperlaneCelo contract (read-only)
   const receiverContract = new ethers.Contract(
     RECEIVER_ADDRESS,
     contractArtifact.abi,

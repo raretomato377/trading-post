@@ -20,7 +20,7 @@ interface IMailbox {
     ) external view returns (uint256);
 }
 
-contract HyperlaneSender is Ownable, IEntropyConsumer {
+contract HyperlaneBase is Ownable, IEntropyConsumer {
     // The Hyperlane Mailbox address on Base Mainnet
     // Source: https://docs.hyperlane.xyz/docs/reference/addresses/deployments/mailbox
     address public constant MAILBOX_ADDRESS = 0xeA87ae93Fa0019a82A727bfd3eBd1cFCa8f64f1D;
@@ -51,10 +51,16 @@ contract HyperlaneSender is Ownable, IEntropyConsumer {
     // Mapping from sequence number to entropy request details
     mapping(uint64 => EntropyRequest) public pendingRequests;
 
+    // Mapping of approved senders: domain => sender address
+    mapping(uint32 => address) public approvedSenders;
+
     // Events to track sent messages
     event MessageSent(bytes32 indexed messageId, uint32 destinationDomain, address recipient);
     event EntropyRequested(uint64 indexed sequenceNumber, uint32 destinationDomain, address recipient, uint256 length);
     event EntropySent(uint64 indexed sequenceNumber, bytes32 messageId, bytes32 randomNumber);
+    event EntropyRequestReceived(uint32 indexed origin, address indexed requester);
+    event Funded(address indexed funder, uint256 amount);
+    event Withdrawn(address indexed recipient, uint256 amount);
 
     constructor() Ownable(msg.sender) {
         mailbox = IMailbox(MAILBOX_ADDRESS);
@@ -97,6 +103,79 @@ contract HyperlaneSender is Ownable, IEntropyConsumer {
 
         // Clean up the pending request
         delete pendingRequests[sequence];
+    }
+
+    /**
+     * @notice Handles incoming messages from the Hyperlane Mailbox.
+     * @dev This receives entropy requests from the receiver contract on the destination chain.
+     *
+     * @param _origin The Domain ID of the chain the message came from.
+     * @param _sender The address of the sender contract on the origin chain (as bytes32).
+     * @param _messageBody The raw byte data sent (the encoded requester address).
+     */
+    function handle(
+        uint32 _origin,
+        bytes32 _sender,
+        bytes calldata _messageBody
+    ) external payable onlyMailbox {
+        // Decode the requester address from the message
+        address requester = abi.decode(_messageBody, (address));
+
+        emit EntropyRequestReceived(_origin, requester);
+
+        // Trigger entropy request - use the stored value from the mailbox call
+        _requestAndRelayEntropyInternal(_origin, requester, msg.value);
+    }
+
+    /**
+     * @notice Internal function to request entropy and relay it to a recipient.
+     * @param _destinationDomain The Hyperlane Domain ID of the target chain.
+     * @param _recipient The address of the contract/wallet receiving the random number.
+     * @param _payment The ETH payment provided for fees.
+     */
+    function _requestAndRelayEntropyInternal(
+        uint32 _destinationDomain,
+        address _recipient,
+        uint256 _payment
+    ) internal {
+        // Calculate required fees
+        uint128 entropyFee = entropy.getFeeV2();
+
+        // Estimate Hyperlane cost for sending the entropy data
+        bytes32 recipientBytes32 = addressToBytes32(_recipient);
+        EntropyData memory dummyData = EntropyData({
+            randomNumber: bytes32(0),
+            entropyLength: 32,
+            sequenceNumber: 0,
+            sourceContract: address(this)
+        });
+        bytes memory dummyMessage = abi.encode(dummyData);
+        uint256 hyperlaneQuote = mailbox.quoteDispatch(
+            _destinationDomain,
+            recipientBytes32,
+            dummyMessage
+        );
+
+        uint256 totalRequired = uint256(entropyFee) + hyperlaneQuote;
+
+        // Check if we have enough funds (from msg.value + contract balance)
+        uint256 availableFunds = _payment + address(this).balance;
+        require(availableFunds >= totalRequired, "Insufficient funds in contract");
+
+        // Request entropy from Pyth
+        uint64 sequenceNumber = entropy.requestV2{value: entropyFee}();
+
+        // Store the request details for the callback
+        pendingRequests[sequenceNumber] = EntropyRequest({
+            destinationDomain: _destinationDomain,
+            recipient: _recipient,
+            length: 32,
+            hyperlaneValue: hyperlaneQuote
+        });
+
+        emit EntropyRequested(sequenceNumber, _destinationDomain, _recipient, 32);
+
+        // No refund - keep any excess in the contract for future requests
     }
 
     /**
@@ -236,6 +315,33 @@ contract HyperlaneSender is Ownable, IEntropyConsumer {
         if (msg.value > quote) {
             payable(msg.sender).transfer(msg.value - quote);
         }
+    }
+
+    /**
+     * @notice Receive function to accept ETH for funding entropy requests
+     * @dev Allows anyone to send ETH directly to the contract to fund operations
+     */
+    receive() external payable {
+        emit Funded(msg.sender, msg.value);
+    }
+
+    /**
+     * @notice Get the contract's ETH balance
+     * @return The balance in wei
+     */
+    function getBalance() external view returns (uint256) {
+        return address(this).balance;
+    }
+
+    /**
+     * @notice Emergency withdraw function (owner only)
+     * @dev Only use this to recover stuck funds
+     * @param _amount The amount of ETH to withdraw in wei
+     */
+    function emergencyWithdraw(uint256 _amount) external onlyOwner {
+        require(_amount <= address(this).balance, "Insufficient balance");
+        payable(owner()).transfer(_amount);
+        emit Withdrawn(owner(), _amount);
     }
 
     /**

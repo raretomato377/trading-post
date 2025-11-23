@@ -5,7 +5,7 @@ interface IMailbox {
     function bytes32ToAddress(bytes32 _bytes32) external pure returns (address);
 }
 
-contract HyperlaneReceiver {
+contract HyperlaneCelo is Ownable {
     // 1. The Mailbox address on the DESTINATION chain (Celo).
     // Source: https://docs.hyperlane.xyz/docs/reference/addresses/deployments/mailbox
     // Celo Chain ID: 42220

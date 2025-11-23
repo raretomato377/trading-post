@@ -7,17 +7,51 @@ async function main() {
   // Parse command line arguments
   const args = process.argv.slice(2);
 
+  // Parse --contract-address flag
+  const contractAddressIndex = args.indexOf('--contract-address');
+  if (contractAddressIndex === -1) {
+    console.error("❌ Error: --contract-address flag is required");
+    console.log("\nUsage:");
+    console.log("  node scripts/send-message-base.js --contract-address <address> --receiver-address <address> --use-entropy <true|false> --quote-only <true|false> [message]");
+    console.log("\nExamples:");
+    console.log("  node scripts/send-message-base.js --contract-address 0x123... --receiver-address 0x456... --use-entropy false --quote-only true \"Hello!\"");
+    console.log("  node scripts/send-message-base.js --contract-address 0x123... --receiver-address 0x456... --use-entropy true --quote-only false");
+    process.exit(1);
+  }
+
+  const SENDER_ADDRESS = args[contractAddressIndex + 1];
+  if (!SENDER_ADDRESS || !SENDER_ADDRESS.startsWith('0x')) {
+    console.error("❌ Error: Invalid contract address");
+    process.exit(1);
+  }
+
+  // Parse --receiver-address flag
+  const receiverAddressIndex = args.indexOf('--receiver-address');
+  if (receiverAddressIndex === -1) {
+    console.error("❌ Error: --receiver-address flag is required");
+    console.log("\nUsage:");
+    console.log("  node scripts/send-message-base.js --contract-address <address> --receiver-address <address> --use-entropy <true|false> --quote-only <true|false> [message]");
+    console.log("\nExamples:");
+    console.log("  node scripts/send-message-base.js --contract-address 0x123... --receiver-address 0x456... --use-entropy false --quote-only true \"Hello!\"");
+    console.log("  node scripts/send-message-base.js --contract-address 0x123... --receiver-address 0x456... --use-entropy true --quote-only false");
+    process.exit(1);
+  }
+
+  const RECEIVER_ADDRESS = args[receiverAddressIndex + 1];
+  if (!RECEIVER_ADDRESS || !RECEIVER_ADDRESS.startsWith('0x')) {
+    console.error("❌ Error: Invalid receiver address");
+    process.exit(1);
+  }
+
   // Parse --use-entropy flag
   const useEntropyIndex = args.indexOf('--use-entropy');
   if (useEntropyIndex === -1) {
     console.error("❌ Error: --use-entropy flag is required");
     console.log("\nUsage:");
-    console.log("  node scripts/send-message.js --use-entropy <true|false> --quote-only <true|false> [message]");
+    console.log("  node scripts/send-message-base.js --contract-address <address> --receiver-address <address> --use-entropy <true|false> --quote-only <true|false> [message]");
     console.log("\nExamples:");
-    console.log("  node scripts/send-message.js --use-entropy false --quote-only true \"Hello!\"");
-    console.log("  node scripts/send-message.js --use-entropy false --quote-only false \"Hello!\"");
-    console.log("  node scripts/send-message.js --use-entropy true --quote-only true");
-    console.log("  node scripts/send-message.js --use-entropy true --quote-only false");
+    console.log("  node scripts/send-message-base.js --contract-address 0x123... --receiver-address 0x456... --use-entropy false --quote-only true \"Hello!\"");
+    console.log("  node scripts/send-message-base.js --contract-address 0x123... --receiver-address 0x456... --use-entropy true --quote-only false");
     process.exit(1);
   }
 
@@ -33,12 +67,10 @@ async function main() {
   if (quoteOnlyIndex === -1) {
     console.error("❌ Error: --quote-only flag is required");
     console.log("\nUsage:");
-    console.log("  node scripts/send-message.js --use-entropy <true|false> --quote-only <true|false> [message]");
+    console.log("  node scripts/send-message-base.js --contract-address <address> --receiver-address <address> --use-entropy <true|false> --quote-only <true|false> [message]");
     console.log("\nExamples:");
-    console.log("  node scripts/send-message.js --use-entropy false --quote-only true \"Hello!\"");
-    console.log("  node scripts/send-message.js --use-entropy false --quote-only false \"Hello!\"");
-    console.log("  node scripts/send-message.js --use-entropy true --quote-only true");
-    console.log("  node scripts/send-message.js --use-entropy true --quote-only false");
+    console.log("  node scripts/send-message-base.js --contract-address 0x123... --receiver-address 0x456... --use-entropy false --quote-only true \"Hello!\"");
+    console.log("  node scripts/send-message-base.js --contract-address 0x123... --receiver-address 0x456... --use-entropy true --quote-only false");
     process.exit(1);
   }
 
@@ -51,14 +83,14 @@ async function main() {
 
   // Get message (if provided, exclude flag arguments)
   const messageArgs = args.filter((arg, index) =>
+    arg !== '--contract-address' && index !== contractAddressIndex + 1 &&
+    arg !== '--receiver-address' && index !== receiverAddressIndex + 1 &&
     arg !== '--use-entropy' && index !== useEntropyIndex + 1 &&
     arg !== '--quote-only' && index !== quoteOnlyIndex + 1
   );
   const message = messageArgs[0] || "Hello from Base to Celo!";
 
   // Configuration
-  const SENDER_ADDRESS = "0x37a53234C1d418EaCfB3E52dA09018A1672b95Ee"; // Base
-  const RECEIVER_ADDRESS = "0x8Ea7eBc246A8358f8381C89C27Af14074A437BCC"; // Celo
   const CELO_DOMAIN_ID = 42220;
   const BASE_RPC = "https://mainnet.base.org";
 
@@ -89,12 +121,12 @@ async function main() {
   // Load contract ABI
   const contractArtifact = JSON.parse(
     fs.readFileSync(
-      path.join(__dirname, "../artifacts/contracts/HyperlaneSource.sol/HyperlaneSender.json"),
+      path.join(__dirname, "../artifacts/contracts/HyperlaneSource.sol/HyperlaneBase.json"),
       "utf8"
     )
   );
 
-  // Connect to HyperlaneSender contract
+  // Connect to HyperlaneBase contract
   const senderContract = new ethers.Contract(
     SENDER_ADDRESS,
     contractArtifact.abi,

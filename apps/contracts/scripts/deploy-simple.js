@@ -38,7 +38,7 @@ async function main() {
     process.exit(1);
   }
 
-  const validContracts = ["Lock", "RandomNumbers", "HyperlaneSender", "HyperlaneReceiver"];
+  const validContracts = ["Lock", "RandomNumbers", "HyperlaneBase", "HyperlaneCelo"];
   if (!validContracts.includes(contractName)) {
     console.error(`Unknown contract: ${contractName}`);
     console.log("Available contracts:", validContracts.join(", "));
@@ -63,11 +63,7 @@ async function main() {
   console.log("Balance:", ethers.formatEther(balance), "tokens\n");
 
   // Read compiled contract
-  // Special cases: HyperlaneSender is in HyperlaneSource.sol, HyperlaneReceiver is in HyperlaneReceiver.sol
   let sourceFile = contractName;
-  if (contractName === "HyperlaneSender") {
-    sourceFile = "HyperlaneSource";
-  }
 
   const contractArtifact = JSON.parse(
     fs.readFileSync(
@@ -99,12 +95,24 @@ async function main() {
   } else if (contractName === "RandomNumbers") {
     console.log("Deploying RandomNumbers contract...");
     contract = await factory.deploy();
-  } else if (contractName === "HyperlaneSender") {
-    console.log("Deploying HyperlaneSender contract...");
+  } else if (contractName === "HyperlaneBase") {
+    console.log("Deploying HyperlaneBase contract...");
     contract = await factory.deploy();
-  } else if (contractName === "HyperlaneReceiver") {
-    console.log("Deploying HyperlaneReceiver contract...");
-    contract = await factory.deploy();
+  } else if (contractName === "HyperlaneCelo") {
+    // HyperlaneCelo requires constructor params: sourceDomain and sourceContract
+    const sourceDomain = 8453; // Base mainnet domain ID
+    const sourceContract = process.argv[4]; // Get from command line
+
+    if (!sourceContract) {
+      console.error("\nError: HyperlaneCelo requires the HyperlaneBase contract address");
+      console.error("Usage: node scripts/deploy-simple.js celo HyperlaneCelo <HyperlaneBase_address>");
+      process.exit(1);
+    }
+
+    console.log("Deploying HyperlaneCelo contract...");
+    console.log("Source Domain (Base):", sourceDomain);
+    console.log("Source Contract:", sourceContract);
+    contract = await factory.deploy(sourceDomain, sourceContract);
   }
 
   console.log("Waiting for deployment...");
@@ -113,7 +121,21 @@ async function main() {
   const address = await contract.getAddress();
 
   console.log(`\n✅ ${contractName} contract deployed to: ${address}`);
-  console.log(`   View on Explorer: ${network.explorer}/address/${address}\n`);
+  console.log(`   View on Explorer: ${network.explorer}/address/${address}`);
+
+  // Print verification command
+  console.log(`\nTo verify this contract, run:`);
+  if (contractName === "HyperlaneCelo") {
+    const sourceDomain = 8453;
+    const sourceContract = process.argv[4];
+    console.log(`npx hardhat verify --network ${networkName} ${address} ${sourceDomain} ${sourceContract}\n`);
+  } else if (contractName === "Lock") {
+    const currentTimestampInSeconds = Math.round(Date.now() / 1000);
+    const unlockTime = currentTimestampInSeconds + 365 * 24 * 60 * 60;
+    console.log(`npx hardhat verify --network ${networkName} ${address} ${unlockTime}\n`);
+  } else {
+    console.log(`npx hardhat verify --network ${networkName} ${address}\n`);
+  }
 }
 
 main()
