@@ -160,18 +160,6 @@ export function useGameStateManager(gameId: bigint | undefined) {
     const deadlineNum = Number(deadline);
     const remaining = deadlineNum - now;
     
-    // Log for debugging resolution timer
-    if (deadline > 0n && remaining < 600) { // Log if less than 10 minutes remaining
-      console.log('🎮 [getTimeRemaining] Timer calculation:', {
-        deadline: deadline.toString(),
-        deadlineNum,
-        now,
-        remaining,
-        remainingMinutes: Math.floor(remaining / 60),
-        remainingSeconds: remaining % 60,
-      });
-    }
-    
     return Math.max(0, remaining);
   }, []);
 
