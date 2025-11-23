@@ -15,6 +15,7 @@ const config: HardhatUserConfig = {
         enabled: true,
         runs: 200,
       },
+      viaIR: true, // Enable IR-based code generation to handle deep stack
     },
   },
   networks: {

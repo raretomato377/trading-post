@@ -18,11 +18,29 @@ export function GameStatusDisplay({ gameId }: GameStatusProps) {
   } = useGameStateManager(gameId);
 
   if (isLoading || !gameState) {
+    // Skeleton loader that matches the actual content structure to prevent layout shift
     return (
-      <div className="w-full max-w-2xl mx-auto p-4 bg-white rounded-lg shadow">
+      <div className="w-full max-w-2xl mx-auto p-4 rounded-lg border-2 bg-gray-100 border-gray-200 min-h-[140px]">
         <div className="animate-pulse">
-          <div className="h-4 bg-gray-200 rounded w-1/4 mb-2"></div>
-          <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+          {/* Header section - matches actual header */}
+          <div className="flex items-center justify-between mb-2">
+            <div className="space-y-2">
+              <div className="h-5 bg-gray-300 rounded w-32"></div>
+              <div className="h-4 bg-gray-300 rounded w-24"></div>
+            </div>
+            <div className="text-right space-y-2">
+              <div className="h-8 bg-gray-300 rounded w-24 ml-auto"></div>
+              <div className="h-4 bg-gray-300 rounded w-32 ml-auto"></div>
+            </div>
+          </div>
+          
+          {/* Border section - matches actual border section */}
+          <div className="mt-4 pt-4 border-t border-gray-300">
+            <div className="space-y-2">
+              <div className="h-4 bg-gray-300 rounded w-16"></div>
+              <div className="h-6 bg-gray-300 rounded w-8"></div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -69,7 +87,7 @@ export function GameStatusDisplay({ gameId }: GameStatusProps) {
   };
 
   return (
-    <div className={`w-full max-w-2xl mx-auto p-4 rounded-lg border-2 ${getStatusColor()}`}>
+    <div className={`w-full max-w-2xl mx-auto p-4 rounded-lg border-2 min-h-[140px] ${getStatusColor()}`}>
       <div className="flex items-center justify-between mb-2">
         <div>
           <h3 className="text-lg font-semibold">Game Status</h3>

@@ -13,20 +13,21 @@ try {
   const connectorAny = originalConnector as any;
   
   // Define getChainId polyfill function
-  const getChainIdPolyfill = async () => {
+  const getChainIdPolyfill = async function(this: any) {
     try {
-      // Try to get chainId from various sources on the connector
-      if (connectorAny.chains && connectorAny.chains.length > 0) {
-        return connectorAny.chains[0].id;
+      // Try to get chainId from various sources on the connector instance
+      const instance = this || connectorAny;
+      if (instance?.chains && instance.chains.length > 0) {
+        return instance.chains[0].id;
       }
-      if (connectorAny.chainId !== undefined) {
-        return connectorAny.chainId;
+      if (instance?.chainId !== undefined) {
+        return instance.chainId;
       }
-      if (connectorAny.provider?.chainId) {
-        return connectorAny.provider.chainId;
+      if (instance?.provider?.chainId) {
+        return instance.provider.chainId;
       }
-      if (connectorAny.state?.chainId) {
-        return connectorAny.state.chainId;
+      if (instance?.state?.chainId) {
+        return instance.state.chainId;
       }
     } catch (e) {
       // Ignore errors
@@ -34,30 +35,54 @@ try {
     return celo.id; // Default to Celo Mainnet
   };
   
-  // Add getChainId directly to the connector object
-  if (typeof connectorAny.getChainId !== 'function') {
-    connectorAny.getChainId = getChainIdPolyfill;
-  }
+  // Use Object.defineProperty to ensure getChainId is always available
+  // This makes it non-configurable and ensures it can't be deleted
+  Object.defineProperty(connectorAny, 'getChainId', {
+    value: getChainIdPolyfill,
+    writable: false, // Prevent overwriting
+    configurable: true, // Allow redefinition if needed
+    enumerable: false, // Don't show in for...in loops
+  });
   
-  // Also patch the prototype if it exists
-  if (connectorAny.constructor?.prototype) {
-    const prototype = connectorAny.constructor.prototype;
-    if (typeof prototype.getChainId !== 'function') {
-      prototype.getChainId = getChainIdPolyfill;
+  // Patch the prototype chain to ensure all instances have it
+  let proto = Object.getPrototypeOf(connectorAny);
+  while (proto && proto !== Object.prototype) {
+    if (!proto.hasOwnProperty('getChainId')) {
+      Object.defineProperty(proto, 'getChainId', {
+        value: getChainIdPolyfill,
+        writable: false,
+        configurable: true,
+        enumerable: false,
+      });
     }
+    proto = Object.getPrototypeOf(proto);
   }
   
-  // Wrap in Proxy to catch any getChainId calls that might bypass the direct property
+  // Wrap in Proxy to intercept all property access
   farcasterConnector = new Proxy(originalConnector, {
     get(target, prop, receiver) {
       if (prop === 'getChainId') {
-        const originalMethod = (target as any).getChainId;
-        if (typeof originalMethod === 'function') {
-          return originalMethod.bind(target);
-        }
-        return getChainIdPolyfill;
+        // Always return the polyfill, even if the target has it
+        return getChainIdPolyfill.bind(target);
       }
-      return Reflect.get(target, prop, receiver);
+      const value = Reflect.get(target, prop, receiver);
+      
+      // If the value is an object (like a nested connector instance), wrap it too
+      if (value && typeof value === 'object' && prop !== 'prototype' && prop !== '__proto__') {
+        // Check if it looks like a connector (has common connector properties)
+        if ('id' in value || 'name' in value || 'type' in value) {
+          return new Proxy(value, {
+            get(nestedTarget, nestedProp) {
+              if (nestedProp === 'getChainId') {
+                return getChainIdPolyfill.bind(nestedTarget);
+              }
+              return Reflect.get(nestedTarget, nestedProp);
+            },
+          });
+        }
+      }
+      
+      return value;
     },
   });
 } catch (error) {

@@ -235,11 +235,30 @@ async function main() {
     process.exit(1);
   }
 
-  // Step 2: Get the deployed address
-  const deployedAddress = getDeployedAddress(networkConfig.chainId);
+  // Step 2: Get the deployed address (with retry logic)
+  // Hardhat Ignition might need a moment to write the deployment file
+  let deployedAddress: string | null = null;
+  const maxAddressRetries = 5;
+  const addressRetryDelay = 1000; // 1 second
+  
+  for (let attempt = 1; attempt <= maxAddressRetries; attempt++) {
+    deployedAddress = getDeployedAddress(networkConfig.chainId);
+    
+    if (deployedAddress) {
+      break; // Found the address, exit retry loop
+    }
+    
+    if (attempt < maxAddressRetries) {
+      console.log(`   ⏳ Waiting for deployment file to be written (attempt ${attempt}/${maxAddressRetries})...`);
+      await new Promise(resolve => setTimeout(resolve, addressRetryDelay));
+    }
+  }
   
   if (!deployedAddress) {
-    console.error("❌ Could not find deployed contract address");
+    console.error("❌ Could not find deployed contract address after retries");
+    console.error("   The deployment may have succeeded, but the address file wasn't found.");
+    console.error(`   Check the deployment directory: ignition/deployments/chain-${networkConfig.chainId}/`);
+    console.error("   You may need to check the Hardhat Ignition output above for the deployed address.");
     process.exit(1);
   }
 

@@ -554,17 +554,21 @@ contract TradingCardGame {
         )
     {
         Game storage game = games[_gameId];
-        bool hasCommitted = false;
-        uint256[3] memory selectedCards;
         
+        // Initialize return values
+        bool hasCommitted = false;
+        uint256[3] memory selectedCards = [uint256(0), uint256(0), uint256(0)];
+        
+        // Get player-specific data if player address is provided
         if (_player != address(0)) {
             PlayerChoice storage choice = game.choices[_player];
-            hasCommitted = choice.committed;
-            if (hasCommitted) {
+            if (choice.committed) {
+                hasCommitted = true;
                 selectedCards = choice.selectedCards;
             }
         }
         
+        // Return all game state data
         return (
             game.status,
             game.startTime,
