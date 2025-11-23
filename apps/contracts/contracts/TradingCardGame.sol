@@ -27,7 +27,7 @@ interface IHyperlaneCelo {
  * @dev Uses Pyth Network for price feeds and implements difficulty-based scoring
  * @dev Uses HyperlaneCelo for secure entropy generation
  */
-contract TradingCardGame is Ownable {
+contract TradingCardGame is IEntropyCallback, Ownable {
     // ============ Constants ============
 
     uint256 public constant LOBBY_DURATION = 60 seconds; // 60 seconds to join
@@ -136,13 +136,15 @@ contract TradingCardGame is Ownable {
         address indexed player,
         uint256 points
     );
+    event EntropyRequested(uint256 indexed gameId, uint256 requestNumber);
+    event EntropyReceived(uint256 indexed gameId, bytes32 randomNumber, uint64 sequenceNumber);
     event Withdrawn(address indexed recipient, uint256 amount);
 
     // ============ Constructor ============
 
-    constructor() {
-        // Pyth contract address on Celo mainnet
-        pyth = IPyth(0xff1a0f4744e8582DF1aE09D5611b887B6a12925C);
+    constructor(address _pythAddress, address _hyperlaneCelo) Ownable(msg.sender) {
+        pyth = IPyth(_pythAddress);
+        hyperlaneCelo = IHyperlaneCelo(_hyperlaneCelo);
         nextGameId = 1;
     }
 
