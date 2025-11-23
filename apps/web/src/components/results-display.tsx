@@ -12,6 +12,10 @@ interface PredictionResult {
   card: Card;
   correct: boolean;
   points: number;
+  startPrice: number; // Price at game start (mocked)
+  currentPrice: number; // Price at game end (mocked)
+  priceDiff: number; // Price difference (mocked)
+  priceDiffPercent: number; // Price difference as percentage (mocked)
 }
 
 interface ResultsDisplayProps {
@@ -59,31 +63,49 @@ export function ResultsDisplay({ gameId, onBack }: ResultsDisplayProps) {
         if (!card) return null;
 
         // Fetch prediction result from contract
+        let correct = false;
+        let points = 0;
+        
         try {
           const response = await fetch(`/api/prediction-result?gameId=${gameId}&cardNumber=${cardNumber}`);
-          if (!response.ok) {
-            console.error(`Failed to fetch result for card ${cardNumber}`);
-            return {
-              card,
-              correct: false,
-              points: 0,
-            };
+          if (response.ok) {
+            const data = await response.json();
+            correct = data.correct || false;
+            points = Number(data.pointsEarned || 0);
           }
-          
-          const data = await response.json();
-          return {
-            card,
-            correct: data.correct || false,
-            points: Number(data.pointsEarned || 0),
-          };
         } catch (error) {
           console.error(`Error fetching result for card ${cardNumber}:`, error);
-          return {
-            card,
-            correct: false,
-            points: 0,
-          };
         }
+
+        // Generate mock price data (matching the actual card picked)
+        // Use card number as seed for consistent mock data
+        const seed = Number(cardNumber);
+        const basePrice = 100 + (seed % 1000); // Base price between 100-1099
+        const startPrice = basePrice;
+        
+        // Generate price change based on prediction type and whether it was correct
+        let priceChangePercent = 0;
+        if (card.predictionType === "price_up") {
+          priceChangePercent = correct ? 5 + (seed % 10) : -(2 + (seed % 5)); // +5-15% if correct, -2-7% if wrong
+        } else if (card.predictionType === "price_down") {
+          priceChangePercent = correct ? -(5 + (seed % 10)) : (2 + (seed % 5)); // -5-15% if correct, +2-7% if wrong
+        } else {
+          priceChangePercent = correct ? 8 + (seed % 12) : -(3 + (seed % 6)); // Larger change for other types
+        }
+        
+        const currentPrice = startPrice * (1 + priceChangePercent / 100);
+        const priceDiff = currentPrice - startPrice;
+        const priceDiffPercent = priceChangePercent;
+
+        return {
+          card,
+          correct,
+          points,
+          startPrice,
+          currentPrice,
+          priceDiff,
+          priceDiffPercent,
+        };
       });
 
       const fetchedResults = (await Promise.all(resultPromises)).filter((r) => r !== null) as PredictionResult[];
@@ -186,34 +208,64 @@ export function ResultsDisplay({ gameId, onBack }: ResultsDisplayProps) {
         {results.map((result) => (
           <div
             key={result.card.id}
-            className={`p-4 rounded-lg border-2 ${
+            className={`p-6 rounded-lg border-2 ${
               result.correct ? "bg-green-50 border-green-300" : "bg-red-50 border-red-300"
             }`}
           >
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-lg font-semibold text-gray-900">{result.card.asset.symbol}</span>
-                  <span
-                    className={`px-2 py-1 rounded text-xs font-medium ${
-                      result.correct
-                        ? "bg-green-200 text-green-800"
-                        : "bg-red-200 text-red-800"
-                    }`}
-                  >
-                    {result.correct ? "✓ Correct" : "✗ Incorrect"}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-600">
-                  Prediction: {result.card.predictionType}
-                </p>
+            {/* Card Header */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <span className="text-xl font-bold text-gray-900">{result.card.asset.symbol}</span>
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                    result.correct
+                      ? "bg-green-200 text-green-800"
+                      : "bg-red-200 text-red-800"
+                  }`}
+                >
+                  {result.correct ? "✓ Correct" : "✗ Incorrect"}
+                </span>
               </div>
               <div className="text-right">
-                <div className="text-2xl font-bold text-gray-900">
+                <div className="text-3xl font-bold text-gray-900">
                   {result.points > 0 ? "+" : ""}
                   {result.points}
                 </div>
-                <div className="text-xs text-gray-500">points</div>
+                <div className="text-xs text-gray-500">points earned</div>
+              </div>
+            </div>
+
+            {/* Prediction Type */}
+            <div className="mb-4">
+              <p className="text-sm font-medium text-gray-700 mb-1">Prediction:</p>
+              <p className="text-base text-gray-900">
+                {result.card.predictionType === "price_up" && `${result.card.asset.symbol} price will go UP`}
+                {result.card.predictionType === "price_down" && `${result.card.asset.symbol} price will go DOWN`}
+                {result.card.predictionType === "price_above" && `${result.card.asset.symbol} price will go ABOVE ${(result.card.targetValue! * 100).toFixed(0)}%`}
+                {result.card.predictionType === "price_below" && `${result.card.asset.symbol} price will go BELOW ${(result.card.targetValue! * 100).toFixed(0)}%`}
+                {result.card.predictionType === "market_cap_above" && `${result.card.asset.symbol} market cap will go ABOVE ${(result.card.targetValue! * 100).toFixed(0)}%`}
+                {result.card.predictionType === "volume_above" && `${result.card.asset.symbol} volume will go ABOVE ${(result.card.targetValue! * 100).toFixed(0)}%`}
+                {result.card.predictionType === "percentage_change" && `${result.card.asset.symbol} will ${result.card.direction === "up" ? "INCREASE" : "DECREASE"} by ${(result.card.percentageChange! * 100).toFixed(0)}%`}
+              </p>
+            </div>
+
+            {/* Price Information */}
+            <div className="grid grid-cols-3 gap-4 pt-4 border-t border-gray-200">
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Start Price</p>
+                <p className="text-lg font-semibold text-gray-900">${result.startPrice.toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Current Price</p>
+                <p className="text-lg font-semibold text-gray-900">${result.currentPrice.toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Price Change</p>
+                <p className={`text-lg font-semibold ${result.priceDiff >= 0 ? "text-green-600" : "text-red-600"}`}>
+                  {result.priceDiff >= 0 ? "+" : ""}
+                  {result.priceDiff.toFixed(2)} ({result.priceDiffPercent >= 0 ? "+" : ""}
+                  {result.priceDiffPercent.toFixed(2)}%)
+                </p>
               </div>
             </div>
           </div>

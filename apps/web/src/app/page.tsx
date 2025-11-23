@@ -135,25 +135,26 @@ export default function Home() {
   // 2. We have a gameState (even if activeGameId is temporarily undefined during polling)
   // Don't show game if we're showing results
   const showGame = (hasActiveGame || (gameState && gameState.status !== GameStatus.ENDED)) && !showingResults && gameState?.status !== GameStatus.ENDED;
-  // Show results if player's game has ended OR if we have an ended game ID stored
-  const showResults = (hasActiveGame && gameState?.status === GameStatus.ENDED) || 
+  // Show results if:
+  // 1. Player's game has ended (hasActiveGame && gameState?.status === ENDED), OR
+  // 2. We have an ended game ID stored (persists even after playerActiveGame is cleared), OR
+  // 3. We're explicitly showing results (showingResults flag)
+  // Once showingResults is true, keep showing results until user goes back
+  const showResults = showingResults || 
+                      (hasActiveGame && gameState?.status === GameStatus.ENDED) || 
                       (endedGameId !== undefined);
   
   // Track when a game ends so we can continue showing results even after playerActiveGame is cleared
+  // Once showingResults is true, keep it true until user explicitly goes back
   useEffect(() => {
     if (gameState?.status === GameStatus.ENDED && gameIdForState) {
       // Store the ended game ID so we can continue showing results
       setEndedGameId(gameIdForState);
       setShowingResults(true);
-    } else if (gameState?.status !== GameStatus.ENDED && endedGameId) {
-      // Clear ended game ID if we're no longer in an ended game
-      // (e.g., user created a new game)
-      if (!currentGameId || currentGameId === 0n) {
-        setEndedGameId(undefined);
-        setShowingResults(false);
-      }
     }
-  }, [gameState?.status, gameIdForState, endedGameId, currentGameId]);
+    // Don't clear showingResults automatically - only clear when user clicks back
+    // This prevents the results page from disappearing
+  }, [gameState?.status, gameIdForState]);
   
   // Handle back from results - clear the showing results state and refresh
   const handleBackFromResults = () => {
