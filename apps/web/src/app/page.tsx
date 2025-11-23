@@ -147,9 +147,14 @@ export default function Home() {
       console.log('🎮 [Page] ✅ Rendering game components:', {
         showGame,
         activeGameId: activeGameId.toString(),
+        activeGameIdType: typeof activeGameId,
         gameStateStatus: gameState?.status,
         hasGameState: !!gameState,
       });
+    }
+    
+    if (showLobby) {
+      console.log('🎮 [Page] ⚠️ Rendering Lobby - showLobby:', showLobby, 'hasActiveGame:', hasActiveGame, 'isCheckingActiveGame:', isCheckingActiveGame);
     }
   }, [currentGameId, activeGameId, hasActiveGame, gameState?.status, showLobby, showGame, showResults, isCheckingActiveGame, isLoadingGameState]);
 

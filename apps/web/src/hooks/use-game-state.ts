@@ -24,6 +24,24 @@ export interface GameStateData {
  */
 export function useGameStateManager(gameId: bigint | undefined) {
   const { address } = useAccount();
+  
+  // Normalize gameId to bigint if it's a string or number
+  const normalizedGameId = gameId 
+    ? (typeof gameId === 'bigint' ? gameId : BigInt(String(gameId)))
+    : undefined;
+  
+  // Log gameId normalization
+  useEffect(() => {
+    if (gameId !== normalizedGameId) {
+      console.log('🎮 [useGameStateManager] Normalized gameId:', {
+        original: gameId?.toString(),
+        originalType: typeof gameId,
+        normalized: normalizedGameId?.toString(),
+        normalizedType: typeof normalizedGameId,
+      });
+    }
+  }, [gameId, normalizedGameId]);
+  
   const [gameState, setGameState] = useState<GameState | undefined>(undefined);
   const [players, setPlayers] = useState<readonly `0x${string}`[] | undefined>(undefined);
   const [cards, setCards] = useState<readonly bigint[] | undefined>(undefined);
@@ -46,7 +64,8 @@ export function useGameStateManager(gameId: bigint | undefined) {
 
   // Fetch all game data from single endpoint
   const fetchGameData = useCallback(async () => {
-    if (!gameId) {
+    if (!normalizedGameId || normalizedGameId === 0n) {
+      console.log('🎮 [useGameStateManager] No gameId, clearing state');
       setGameState(undefined);
       setPlayers(undefined);
       setCards(undefined);
@@ -54,6 +73,8 @@ export function useGameStateManager(gameId: bigint | undefined) {
       setIsInitialLoad(true); // Reset initial load flag when gameId is cleared
       return;
     }
+    
+    console.log('🎮 [useGameStateManager] Fetching game data for gameId:', normalizedGameId.toString());
 
     // Only show loading state if we don't have data yet (initial load)
     // During refreshes, keep showing existing data to prevent flickering
@@ -66,7 +87,7 @@ export function useGameStateManager(gameId: bigint | undefined) {
     try {
       // Use relative URL - Next.js will handle the origin
       const url = new URL('/api/game-state', typeof window !== 'undefined' ? window.location.origin : '');
-      url.searchParams.set('gameId', gameId.toString());
+      url.searchParams.set('gameId', normalizedGameId.toString());
       if (address) {
         url.searchParams.set('playerAddress', address);
       }
@@ -122,18 +143,18 @@ export function useGameStateManager(gameId: bigint | undefined) {
       setIsLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameId, address]); // Removed gameState and isInitialLoad from deps to prevent polling restart
+  }, [normalizedGameId, address]); // Removed gameState and isInitialLoad from deps to prevent polling restart
 
   // Reset initial load flag when gameId changes
   useEffect(() => {
-    if (gameId) {
+    if (normalizedGameId) {
       setIsInitialLoad(true);
     }
-  }, [gameId]);
+  }, [normalizedGameId]);
 
   // Poll the API endpoint
   useEffect(() => {
-    if (!gameId || !isPageVisible) {
+    if (!normalizedGameId || !isPageVisible) {
       return;
     }
 
@@ -148,7 +169,7 @@ export function useGameStateManager(gameId: bigint | undefined) {
     }, POLLING_INTERVAL_MS);
 
     return () => clearInterval(interval);
-  }, [gameId, isPageVisible, fetchGameData]);
+  }, [normalizedGameId, isPageVisible, fetchGameData]);
 
   // Calculate time remaining for each phase
   const getTimeRemaining = useCallback((deadline: bigint): number => {
@@ -245,7 +266,7 @@ export function useGameStateManager(gameId: bigint | undefined) {
   }, [address, gameState?.status, gameState?.resolutionDeadline, resolutionTimeRemaining, isEndingGame, showEndGameButton]);
 
   return {
-    gameId,
+    gameId: normalizedGameId,
     gameState,
     players,
     cards,

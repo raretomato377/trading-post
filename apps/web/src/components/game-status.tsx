@@ -9,6 +9,11 @@ interface GameStatusProps {
 }
 
 export function GameStatusDisplay({ gameId }: GameStatusProps) {
+  // Debug: Log when component renders
+  useEffect(() => {
+    console.log('🎮 [GameStatusDisplay] Component rendered with gameId:', gameId?.toString(), 'type:', typeof gameId);
+  }, [gameId]);
+
   const {
     gameState,
     players,
@@ -23,6 +28,16 @@ export function GameStatusDisplay({ gameId }: GameStatusProps) {
 
   // Debug logging
   useEffect(() => {
+    console.log('🎮 [GameStatusDisplay] State update:', {
+      gameId: gameId?.toString(),
+      hasGameState: !!gameState,
+      status: gameState?.status,
+      isLoading,
+      resolutionDeadline: gameState?.resolutionDeadline?.toString(),
+      resolutionTimeRemaining,
+      showEndGameButton,
+    });
+    
     if (gameState?.status === GameStatus.RESOLUTION) {
       console.log('🎮 [GameStatusDisplay] Resolution phase:', {
         gameId: gameId?.toString(),
@@ -33,7 +48,7 @@ export function GameStatusDisplay({ gameId }: GameStatusProps) {
         isEndingGame,
       });
     }
-  }, [gameId, gameState?.status, gameState?.resolutionDeadline, resolutionTimeRemaining, showEndGameButton, isEndingGame]);
+  }, [gameId, gameState?.status, gameState?.resolutionDeadline, resolutionTimeRemaining, showEndGameButton, isEndingGame, isLoading]);
 
   // Only show loading skeleton on initial load (when we have no data yet)
   // During refreshes, keep showing existing data to prevent flickering
@@ -66,9 +81,20 @@ export function GameStatusDisplay({ gameId }: GameStatusProps) {
     );
   }
 
-  // If we still don't have gameState after loading, return null
+  // If we still don't have gameState after loading, show a loading message instead of returning null
+  // This helps debug why the component might not be rendering
   if (!gameState) {
-    return null;
+    console.warn('🎮 [GameStatusDisplay] No gameState available:', {
+      gameId: gameId?.toString(),
+      isLoading,
+      hasGameId: !!gameId,
+    });
+    return (
+      <div className="w-full max-w-2xl mx-auto p-4 rounded-lg border-2 bg-yellow-100 border-yellow-200 min-h-[140px]">
+        <p className="text-sm text-yellow-800">Loading game state for Game ID: {gameId?.toString() || 'N/A'}</p>
+        {isLoading && <p className="text-xs text-yellow-600 mt-2">Fetching...</p>}
+      </div>
+    );
   }
 
   const status = gameState.status;
