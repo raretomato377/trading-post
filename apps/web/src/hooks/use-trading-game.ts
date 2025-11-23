@@ -1,6 +1,6 @@
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { TRADING_CARD_GAME_CONTRACT, CELO_MAINNET_CHAIN_ID, POLLING_INTERVAL_MS } from "@/config/contracts";
-import { parseAbiItem } from "viem";
+import { parseAbiItem, decodeEventLog } from "viem";
 import { useWatchContractEvent } from "wagmi";
 import { useEffect, useState, useCallback } from "react";
 
@@ -139,16 +139,42 @@ export function useCreateGame() {
     }
   }, [isConfirming]);
 
+  // Extract game ID from transaction receipt
+  const [createdGameId, setCreatedGameId] = useState<bigint | undefined>(undefined);
+
   useEffect(() => {
     if (isSuccess && receipt) {
       console.log('🎮 [createGame] ✅ Transaction confirmed!');
       console.log('🎮 [createGame] Receipt:', receipt);
       
-      // Try to extract game ID from events
-      if (receipt.logs) {
-        console.log('🎮 [createGame] Transaction logs:', receipt.logs);
-        // The GameStarted event should contain the gameId
-        // We'll need to parse it from the logs
+      // Try to extract game ID from GameStarted event
+      if (receipt.logs && receipt.logs.length > 0) {
+        try {
+          // Parse the GameStarted event: event GameStarted(uint256 indexed gameId, address indexed starter)
+          const gameStartedEvent = parseAbiItem('event GameStarted(uint256 indexed gameId, address indexed starter)');
+          
+          for (const log of receipt.logs) {
+            try {
+              const decoded = decodeEventLog({
+                abi: [gameStartedEvent],
+                data: log.data,
+                topics: log.topics,
+              });
+              
+              if (decoded.eventName === 'GameStarted' && decoded.args?.gameId) {
+                const gameId = decoded.args.gameId as bigint;
+                console.log('🎮 [createGame] Extracted game ID from event:', gameId.toString());
+                setCreatedGameId(gameId);
+                break;
+              }
+            } catch (err) {
+              // Not the event we're looking for, continue
+              continue;
+            }
+          }
+        } catch (err) {
+          console.warn('🎮 [createGame] Failed to parse events:', err);
+        }
       }
     }
   }, [isSuccess, receipt]);
@@ -175,6 +201,7 @@ export function useCreateGame() {
     isSuccess,
     error,
     receipt,
+    createdGameId, // Game ID extracted from transaction receipt
   };
 }
 
@@ -692,14 +719,21 @@ export function usePlayerActiveGame(playerAddress: `0x${string}` | undefined) {
     query: {
       enabled: !!playerAddress && isPageVisible,
       refetchInterval: isPageVisible ? POLLING_INTERVAL_MS : false,
+      // Add retry configuration to prevent stuck loading states
+      retry: 2,
+      retryDelay: 1000,
     },
   });
 
   const activeGameId = data && data > 0n ? data as bigint : undefined;
 
+  // If there's an error and we've been loading for too long, consider it done
+  // This prevents the button from being stuck in "Checking..." forever
+  const isChecking = isLoading && !error;
+
   return {
     activeGameId,
-    isChecking: isLoading,
+    isChecking,
     hasActiveGame: activeGameId !== undefined,
     error,
     refetch,
@@ -718,6 +752,7 @@ export function useAvailableLobbies(playerAddress: `0x${string}` | undefined) {
   useEffect(() => {
     if (!nextGameId || nextGameId === 1n) {
       setAvailableLobbies([]);
+      setIsLoading(false); // Ensure loading is false when no games exist
       return;
     }
 
@@ -776,6 +811,7 @@ export function useAvailableLobbies(playerAddress: `0x${string}` | undefined) {
         setAvailableLobbies(lobbies);
       } catch (err) {
         console.error('Error finding lobbies:', err);
+        setAvailableLobbies([]); // Set empty array on error
       } finally {
         setIsLoading(false);
       }

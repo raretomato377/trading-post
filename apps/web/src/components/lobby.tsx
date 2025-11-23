@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAccount, useSwitchChain, useBalance } from "wagmi";
-import { useCreateGame, useJoinGame, useGameState, GameStatus, useNextGameId, usePlayerActiveGame, useAvailableLobbies } from "@/hooks/use-trading-game";
+import { useCreateGame, useJoinGame, useGameState, GameStatus, useNextGameId, usePlayerActiveGame, useAvailableLobbies, useGamePlayers } from "@/hooks/use-trading-game";
 import { CELO_MAINNET_CHAIN_ID } from "@/config/contracts";
 import { formatTimeRemaining } from "@/hooks/use-game-state";
 import { formatUnits } from "viem";
@@ -16,7 +16,7 @@ interface LobbyProps {
 export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps) {
   const { address, isConnected, chainId } = useAccount();
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
-  const { createGame, isPending: isCreating, isSuccess: createSuccess, hash, error: createError, receipt } = useCreateGame();
+  const { createGame, isPending: isCreating, isSuccess: createSuccess, hash, error: createError, receipt, createdGameId: receiptGameId } = useCreateGame();
   const { nextGameId } = useNextGameId();
   const { hasActiveGame, activeGameId, isChecking: isCheckingActiveGame } = usePlayerActiveGame(address);
   const { availableLobbies, isLoading: isLoadingLobbies, hasAvailableLobbies } = useAvailableLobbies(address);
@@ -71,6 +71,12 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
   // This ensures we fetch the new game's state immediately after creation
   const gameIdForState = localGameId || currentGameId;
   const { gameState, isLoading, refetch } = useGameState(gameIdForState);
+  const { players: gamePlayers } = useGamePlayers(gameIdForState);
+  
+  // Check if the current player is already in this game
+  const isPlayerInGame = address && gamePlayers 
+    ? gamePlayers.some((player) => player.toLowerCase() === address.toLowerCase())
+    : false;
 
   // Log all state changes
   useEffect(() => {
@@ -88,15 +94,37 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
     });
   }, [currentGameId, localGameId, createdGameId, isConnected, address, isCreating, createSuccess, hash, createError, nextGameId]);
 
-  // Try to get game ID after creation
+  // Try to get game ID after creation - prefer game ID from receipt, fallback to nextGameId calculation
   useEffect(() => {
-    if (createSuccess && nextGameId) {
-      // The new game ID should be nextGameId - 1 (since nextGameId increments after creation)
+    // First, try to use the game ID extracted from the transaction receipt (most reliable)
+    if (createSuccess && receiptGameId) {
+      console.log('🎮 [Lobby] Game created! New game ID from receipt:', receiptGameId.toString());
+      
+      if (!createdGameId || createdGameId !== receiptGameId) {
+        setCreatedGameId(receiptGameId);
+        setLocalGameId(receiptGameId);
+        if (onGameStarted) {
+          onGameStarted(receiptGameId);
+        }
+        // Immediately refetch game state for the new game
+        setTimeout(() => {
+          console.log('🎮 [Lobby] Refetching game state for new game:', receiptGameId.toString());
+          refetch();
+        }, 1000); // Wait 1 second for the transaction to be indexed
+      }
+    } 
+    // Fallback: calculate from nextGameId if receipt parsing failed
+    // Game IDs start at 1, so if nextGameId is 2, the new game is 1
+    // If nextGameId is 3, the new game is 2, etc.
+    else if (createSuccess && nextGameId && nextGameId > 1n) {
+      // The new game ID is nextGameId - 1 (since nextGameId increments after creation)
+      // nextGameId starts at 1, so first game has ID 1, then nextGameId becomes 2
       const newGameId = nextGameId - 1n;
-      console.log('🎮 [Lobby] Game created! New game ID:', newGameId.toString());
+      console.log('🎮 [Lobby] Game created! New game ID from nextGameId:', newGameId.toString());
       console.log('🎮 [Lobby] Next game ID:', nextGameId.toString());
       
-      if (!createdGameId || createdGameId !== newGameId) {
+      // Only use this if we got a valid game ID (>= 1)
+      if (newGameId >= 1n && (!createdGameId || createdGameId !== newGameId)) {
         setCreatedGameId(newGameId);
         setLocalGameId(newGameId);
         if (onGameStarted) {
@@ -108,8 +136,12 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
           refetch();
         }, 1000); // Wait 1 second for the transaction to be indexed
       }
+    } else if (createSuccess && nextGameId === 1n) {
+      // If nextGameId is still 1 after creation, the transaction might not have been indexed yet
+      // This shouldn't happen if the game was created successfully, but we'll wait
+      console.log('🎮 [Lobby] Waiting for nextGameId to update (still 1, transaction may not be indexed yet)...');
     }
-  }, [createSuccess, nextGameId, createdGameId, onGameStarted, refetch]);
+  }, [createSuccess, receiptGameId, nextGameId, createdGameId, onGameStarted, refetch]);
 
   const handleCreateGame = () => {
     console.log('🎮 [Lobby] handleCreateGame called');
@@ -159,7 +191,8 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
 
   // If there's a current game in LOBBY state, show join option
   // Or if there are available lobbies, show join option
-  const canJoin = (gameIdForState && gameState?.status === GameStatus.LOBBY) || hasAvailableLobbies;
+  // But don't show join option if the player is already in the game
+  const canJoin = ((gameIdForState && gameState?.status === GameStatus.LOBBY && !isPlayerInGame) || hasAvailableLobbies);
 
   // Calculate time remaining
   const timeRemaining = gameState?.lobbyDeadline
@@ -221,10 +254,10 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
             )}
             <button
               onClick={handleJoinGame}
-              disabled={isJoining || !isConnected || (hasActiveGame && activeGameId !== gameIdForState) || isCheckingActiveGame || isLoadingLobbies}
+              disabled={isJoining || !isConnected || (hasActiveGame && activeGameId !== gameIdForState) || isCheckingActiveGame || isLoadingLobbies || isPlayerInGame}
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
             >
-              {isJoining ? "Joining..." : isCheckingActiveGame || isLoadingLobbies ? "Checking..." : (hasActiveGame && activeGameId !== gameIdForState) ? "Already in Another Game" : "Join Lobby"}
+              {isJoining ? "Joining..." : isCheckingActiveGame || isLoadingLobbies ? "Checking..." : (hasActiveGame && activeGameId !== gameIdForState) ? "Already in Another Game" : isPlayerInGame ? "Already Joined" : "Join Lobby"}
             </button>
           </div>
         </div>
