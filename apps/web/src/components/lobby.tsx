@@ -23,13 +23,23 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
   
   // Check wallet balance on Celo Mainnet (always check, regardless of current chain)
   // This ensures we show the correct balance even if user is on wrong chain
-  const { data: balance, isLoading: isLoadingBalance } = useBalance({
+  const { data: balance, isLoading: isLoadingBalance, error: balanceError } = useBalance({
     address,
     chainId: CELO_MAINNET_CHAIN_ID, // Always check Celo Mainnet balance
     query: {
       enabled: isConnected && !!address,
     },
   });
+  
+  // Log balance for debugging
+  useEffect(() => {
+    if (balance) {
+      console.log('🎮 [Lobby] Celo Mainnet balance:', formatUnits(balance.value, balance.decimals), balance.symbol);
+    }
+    if (balanceError) {
+      console.error('🎮 [Lobby] Balance check error:', balanceError);
+    }
+  }, [balance, balanceError]);
   
   // Use the first available lobby if no currentGameId is set
   const lobbyToJoin = currentGameId || (availableLobbies.length > 0 ? availableLobbies[0].gameId : undefined);

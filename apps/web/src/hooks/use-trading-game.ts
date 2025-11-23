@@ -105,14 +105,28 @@ export function useCreateGame() {
           errorMessage?.toLowerCase().includes('balance') ||
           errorMessage?.toLowerCase().includes('funds')) {
         console.error('🎮 [createGame] Insufficient balance error detected');
+        console.error('🎮 [createGame] Full error object:', JSON.stringify(err, null, 2));
+        console.error('🎮 [createGame] Error code:', err?.code);
+        console.error('🎮 [createGame] Error name:', err?.name);
         console.error('🎮 [createGame] Current chain:', chainId);
         console.error('🎮 [createGame] Expected chain:', CELO_MAINNET_CHAIN_ID);
+        console.error('🎮 [createGame] Contract address:', TRADING_CARD_GAME_CONTRACT.address);
+        console.error('🎮 [createGame] Wallet address:', address);
         console.error('🎮 [createGame] This might be due to:');
         console.error('  1. Wallet is on wrong network (not Celo Mainnet)');
         console.error('  2. Gas estimation failed (contract might be reverting)');
         console.error('  3. Actual insufficient CELO balance for gas');
         console.error('  4. RPC endpoint issues');
         console.error('  5. Contract not deployed at this address');
+        console.error('  6. Transaction would revert (check contract state)');
+        
+        // Try to get more details from the error
+        if (err?.cause) {
+          console.error('🎮 [createGame] Error cause:', err.cause);
+        }
+        if (err?.data) {
+          console.error('🎮 [createGame] Error data:', err.data);
+        }
       }
       
       throw err;
