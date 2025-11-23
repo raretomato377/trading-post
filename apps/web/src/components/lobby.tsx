@@ -354,14 +354,15 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
                     <div className="space-y-2">
                       <p className="text-red-600 font-semibold">❌ Error: {createError.message}</p>
                     {mightBeChainIssue ? (
-                      <div className="mt-2 p-3 bg-orange-50 border border-orange-200 rounded text-xs">
-                        <p className="text-orange-800 font-semibold mb-1">⚠️ Wrong Network Detected</p>
-                        <p className="text-orange-700 mb-2">
-                          This error might be because you&apos;re on the wrong network. Please switch to Celo Mainnet first.
-                          {chainId && (
-                            <span className="block mt-1">Current: Chain ID {chainId} (Expected: {CELO_MAINNET_CHAIN_ID})</span>
-                          )}
-                        </p>
+                      <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded text-xs">
+                        <p className="text-blue-800 font-semibold mb-2">Switch to Celo Mainnet</p>
+                        <button
+                          onClick={handleSwitchChain}
+                          disabled={isSwitchingChain}
+                          className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200 text-xs"
+                        >
+                          {isSwitchingChain ? "Switching..." : "Switch Network"}
+                        </button>
                       </div>
                     ) : isInsufficientBalanceError && !isWrongChain ? (
                       <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded text-xs">
@@ -451,28 +452,17 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
       )}
 
       {isWrongChain && (
-        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-sm text-red-800 font-semibold mb-2">
-            ⚠️ Wrong Network
+        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-800 font-semibold mb-2">
+            Switch to Celo Mainnet
           </p>
-          <p className="text-sm text-red-700 mb-2">
-            Please switch to <strong>Celo Mainnet</strong> (Chain ID: {CELO_MAINNET_CHAIN_ID}) to interact with the game.
-            {chainId && (
-              <span className="block mt-1">
-                Current: Chain ID {chainId} 
-                {chainId === 8453 && " (Base Mainnet)"}
-              </span>
-            )}
-          </p>
-          <p className="text-xs text-red-600 mb-3 p-2 bg-red-100 rounded">
-            💡 <strong>Important:</strong> If you&apos;re seeing &quot;Insufficient balance&quot; errors, it&apos;s because you&apos;re on the wrong network. 
-            Your CELO is on Celo Mainnet, but your wallet is currently on {chainId === 8453 ? "Base" : `Chain ${chainId}`}. 
-            Switch to Celo Mainnet first, then try creating a game again.
+          <p className="text-sm text-blue-700 mb-3">
+            This game runs on Celo Mainnet. Please switch your wallet network to continue.
           </p>
           <button
             onClick={handleSwitchChain}
             disabled={isSwitchingChain}
-            className="w-full bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200 text-sm"
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200 text-sm"
           >
             {isSwitchingChain ? "Switching..." : "Switch to Celo Mainnet"}
           </button>

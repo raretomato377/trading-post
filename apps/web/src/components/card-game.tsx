@@ -32,6 +32,9 @@ export function CardGame({ gameId, maxSelections = 3, onChoicesCommitted }: Card
     resolutionTimeRemaining,
     hasCommitted,
     isLoading,
+    showEndChoiceButton,
+    manualTransitionToResolution,
+    isTransitioning,
   } = useGameStateManager(gameId);
 
   const { commitChoices, isPending: isCommitting, isSuccess: commitSuccess } = useCommitChoices(gameId);
@@ -258,6 +261,20 @@ export function CardGame({ gameId, maxSelections = 3, onChoicesCommitted }: Card
                 ) : (
                   <>✅ Commit {maxSelections} Selected Cards</>
                 )}
+              </button>
+            </div>
+          )}
+
+          {/* Manual End Choice Phase Button (if auto-transition was rejected) */}
+          {showEndChoiceButton && (
+            <div className="text-center mt-6 pt-6 border-t border-gray-200">
+              <p className="text-sm text-gray-600 mb-3">Choice phase ended. Click to proceed to resolution:</p>
+              <button
+                onClick={manualTransitionToResolution}
+                disabled={isTransitioning}
+                className="bg-orange-600 hover:bg-orange-700 disabled:bg-orange-400 text-white font-semibold py-2 px-6 rounded-lg transition-colors duration-200 text-sm"
+              >
+                {isTransitioning ? "Transitioning..." : "End Choice Phase"}
               </button>
             </div>
           )}
