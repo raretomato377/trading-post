@@ -121,7 +121,8 @@ export function useGameStateManager(gameId: bigint | undefined) {
     } finally {
       setIsLoading(false);
     }
-  }, [gameId, address, gameState, isInitialLoad]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameId, address]); // Removed gameState and isInitialLoad from deps to prevent polling restart
 
   // Reset initial load flag when gameId changes
   useEffect(() => {
@@ -131,9 +132,6 @@ export function useGameStateManager(gameId: bigint | undefined) {
   }, [gameId]);
 
   // Poll the API endpoint
-  // Note: We use a slightly longer interval here to avoid duplicate polling with useGameState
-  // This hook is used by CardGame component, while useGameState is used by page.tsx
-  const POLLING_INTERVAL_MULTIPLIER = 2; // Poll at 2x the base interval to reduce overlap
   useEffect(() => {
     if (!gameId || !isPageVisible) {
       return;
@@ -142,12 +140,12 @@ export function useGameStateManager(gameId: bigint | undefined) {
     // Fetch immediately
     fetchGameData();
 
-    // Poll at configured interval (multiplied to reduce overlap with other polling)
+    // Poll at configured interval
     const interval = setInterval(() => {
       if (isPageVisible) {
         fetchGameData();
       }
-    }, POLLING_INTERVAL_MS * POLLING_INTERVAL_MULTIPLIER);
+    }, POLLING_INTERVAL_MS);
 
     return () => clearInterval(interval);
   }, [gameId, isPageVisible, fetchGameData]);
