@@ -21,10 +21,13 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
   const { hasActiveGame, activeGameId, isChecking: isCheckingActiveGame } = usePlayerActiveGame(address);
   const { availableLobbies, isLoading: isLoadingLobbies, hasAvailableLobbies } = useAvailableLobbies(address);
   
-  // Check wallet balance
+  // Check wallet balance on Celo Mainnet (only if on correct chain)
   const { data: balance, isLoading: isLoadingBalance } = useBalance({
     address,
-    chainId: CELO_MAINNET_CHAIN_ID,
+    chainId: isConnected && chainId === CELO_MAINNET_CHAIN_ID ? CELO_MAINNET_CHAIN_ID : undefined,
+    query: {
+      enabled: isConnected && chainId === CELO_MAINNET_CHAIN_ID,
+    },
   });
   
   // Use the first available lobby if no currentGameId is set
@@ -33,9 +36,15 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
   
   const isWrongChain = isConnected && chainId !== CELO_MAINNET_CHAIN_ID;
   
-  // Check if balance is too low (less than 0.001 CELO)
+  // Check if balance is too low (less than 0.001 CELO) - only check if on correct chain
   const minBalance = BigInt("1000000000000000"); // 0.001 CELO in wei
-  const hasLowBalance = balance && balance.value < minBalance;
+  const hasLowBalance = !isWrongChain && balance && balance.value < minBalance;
+  
+  // Check if the error is actually a chain mismatch disguised as insufficient balance
+  const isInsufficientBalanceError = createError?.message?.toLowerCase().includes('insufficient') || 
+                                     createError?.message?.toLowerCase().includes('balance') ||
+                                     createError?.message?.toLowerCase().includes('funds');
+  const mightBeChainIssue = isInsufficientBalanceError && isWrongChain;
 
   const handleSwitchChain = async () => {
     try {
@@ -234,20 +243,23 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
                 {createError && (
                   <div className="space-y-2">
                     <p className="text-red-600 font-semibold">❌ Error: {createError.message}</p>
-                    {(createError.message?.toLowerCase().includes('insufficient') || 
-                      createError.message?.toLowerCase().includes('balance') ||
-                      createError.message?.toLowerCase().includes('funds')) && (
+                    {mightBeChainIssue ? (
+                      <div className="mt-2 p-3 bg-orange-50 border border-orange-200 rounded text-xs">
+                        <p className="text-orange-800 font-semibold mb-1">⚠️ Wrong Network Detected</p>
+                        <p className="text-orange-700 mb-2">
+                          This error might be because you're on the wrong network. Please switch to Celo Mainnet first.
+                          {chainId && (
+                            <span className="block mt-1">Current: Chain ID {chainId} (Expected: {CELO_MAINNET_CHAIN_ID})</span>
+                          )}
+                        </p>
+                      </div>
+                    ) : isInsufficientBalanceError && !isWrongChain ? (
                       <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded text-xs">
                         <p className="text-yellow-800 font-semibold mb-1">💡 Need CELO for Gas</p>
                         <p className="text-yellow-700 mb-2">
                           You need CELO in your wallet to pay for transaction fees. Get CELO from:
                         </p>
                         <ul className="list-disc list-inside space-y-1 text-yellow-700">
-                          <li>
-                            <a href="https://celo.org/developers/faucet" target="_blank" rel="noopener noreferrer" className="underline">
-                              Celo Faucet (for testnet)
-                            </a>
-                          </li>
                           <li>
                             <a href="https://valoraapp.com/" target="_blank" rel="noopener noreferrer" className="underline">
                               Valora Wallet
@@ -261,9 +273,14 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
                         </ul>
                         <p className="text-yellow-600 mt-2 text-xs">
                           You only need a small amount (~0.001 CELO) for gas fees.
+                          {balance && (
+                            <span className="block mt-1">
+                              Current balance: {formatUnits(balance.value, balance.decimals)} {balance.symbol}
+                            </span>
+                          )}
                         </p>
                       </div>
-                    )}
+                    ) : null}
                   </div>
                 )}
               </div>
@@ -327,11 +344,19 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
           <p className="text-sm text-red-800 font-semibold mb-2">
             ⚠️ Wrong Network
           </p>
-          <p className="text-sm text-red-700 mb-3">
+          <p className="text-sm text-red-700 mb-2">
             Please switch to <strong>Celo Mainnet</strong> (Chain ID: {CELO_MAINNET_CHAIN_ID}) to interact with the game.
             {chainId && (
-              <span className="block mt-1">Current: Chain ID {chainId}</span>
+              <span className="block mt-1">
+                Current: Chain ID {chainId} 
+                {chainId === 8453 && " (Base Mainnet)"}
+              </span>
             )}
+          </p>
+          <p className="text-xs text-red-600 mb-3 p-2 bg-red-100 rounded">
+            💡 <strong>Important:</strong> If you're seeing "Insufficient balance" errors, it's because you're on the wrong network. 
+            Your CELO is on Celo Mainnet, but your wallet is currently on {chainId === 8453 ? "Base" : `Chain ${chainId}`}. 
+            Switch to Celo Mainnet first, then try creating a game again.
           </p>
           <button
             onClick={handleSwitchChain}

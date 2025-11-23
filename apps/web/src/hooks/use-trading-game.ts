@@ -121,6 +121,11 @@ export function useCreateGame() {
       console.error('🎮 [createGame] Error details:', {
         name: error?.name,
         message: error?.message,
+        cause: (error as any)?.cause,
+        shortMessage: (error as any)?.shortMessage,
+        details: (error as any)?.details,
+        data: (error as any)?.data,
+        stack: (error as any)?.stack,
       });
     }
   }, [error]);

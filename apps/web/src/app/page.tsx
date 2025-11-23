@@ -98,7 +98,7 @@ export default function Home() {
   // If player has an active game that's not ENDED, show that game (not the lobby)
   // If player has an active game in LOBBY, still show the game (they're part of it)
   // Otherwise, show lobby if no game or game is in LOBBY and player is not in it
-  const hasActiveNonEndedGame = playerActiveGameId && gameState && gameState.status !== GameStatus.ENDED;
+  const hasActiveNonEndedGame = currentGameId && gameState && gameState.status !== GameStatus.ENDED;
   const showLobby = !hasActiveNonEndedGame && (!currentGameId || gameState?.status === GameStatus.LOBBY);
   const showGame = currentGameId && gameState && gameState.status !== GameStatus.ENDED;
   const showResults = currentGameId && gameState?.status === GameStatus.ENDED;
