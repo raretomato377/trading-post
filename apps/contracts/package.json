@@ -4,16 +4,27 @@
   "description": "Smart contracts for farcaster-miniapp",
   "main": "index.js",
   "scripts": {
-    "build": "hardhat compile",
-    "compile": "hardhat compile",
-    "test": "hardhat test",
-    "deploy": "hardhat ignition deploy ignition/modules/Lock.ts",
-    "deploy:alfajores": "hardhat ignition deploy ignition/modules/Lock.ts --network alfajores",
-    "deploy:sepolia": "hardhat ignition deploy ignition/modules/Lock.ts --network sepolia",
-    "deploy:celo": "hardhat ignition deploy ignition/modules/Lock.ts --network celo",
-    "verify": "hardhat verify",
+    "build": "echo y | hardhat compile",
+    "compile": "echo y | hardhat compile",
+    "test": "echo y | hardhat test",
+    "deploy": "echo y | hardhat ignition deploy ignition/modules/Lock.ts",
+    "deploy:alfajores": "echo y | hardhat ignition deploy ignition/modules/Lock.ts --network alfajores",
+    "deploy:sepolia": "echo y | hardhat ignition deploy ignition/modules/Lock.ts --network sepolia",
+    "deploy:celo": "echo y | hardhat ignition deploy ignition/modules/Lock.ts --network celo",
+    "deploy:game": "echo y | hardhat ignition deploy ignition/modules/TradingCardGame.ts",
+    "deploy:game:alfajores": "echo y | hardhat ignition deploy ignition/modules/TradingCardGame.ts --network alfajores --parameters '{\"TradingCardGameModule\":{\"pythAddress\":\"0x74f09cb3c7e2A01865f424FD14F6dc9A14E3e94E\"}}'",
+    "deploy:game:sepolia": "echo y | hardhat ignition deploy ignition/modules/TradingCardGame.ts --network sepolia --parameters '{\"TradingCardGameModule\":{\"pythAddress\":\"0x0000000000000000000000000000000000000000\"}}'",
+    "deploy:game:celo": "echo y | hardhat ignition deploy ignition/modules/TradingCardGame.ts --network celo --parameters '{\"TradingCardGameModule\":{\"pythAddress\":\"0xff1a0f4744e8582DF1aE09D5611b887B6a12925C\"}}'",
+    "deploy:game:verify:alfajores": "ts-node scripts/deploy-and-verify.ts alfajores",
+    "deploy:game:verify:sepolia": "ts-node scripts/deploy-and-verify.ts sepolia",
+    "deploy:game:verify:celo": "ts-node scripts/deploy-and-verify.ts celo",
+    "verify": "echo y | hardhat verify",
+    "verify:game:alfajores": "hardhat verify --network alfajores",
+    "verify:game:celo": "hardhat verify --network celo",
+    "verify:game:sepolia": "hardhat verify --network sepolia",
+    "check:bytecode": "ts-node scripts/check-contract-bytecode.ts",
     "clean": "hardhat clean",
-    "typechain": "hardhat typechain"
+    "typechain": "echo y | hardhat typechain"
   },
   "keywords": [
     "hardhat",
@@ -51,6 +62,8 @@
     "@hyperlane-xyz/core": "^10.0.3",
     "@openzeppelin/contracts": "^5.0.0",
     "@pythnetwork/entropy-sdk-solidity": "^2.2.1",
+    "@pythnetwork/entropy-sdk-solidity": "^2.2.1",
+    "@pythnetwork/pyth-sdk-solidity": "^4.3.1",
     "dotenv": "^17.2.3"
   }
 }

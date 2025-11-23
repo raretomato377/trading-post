@@ -48,3 +48,150 @@ export const RANDOM_NUMBERS_CONTRACT = {
 
 // Celo Sepolia Chain ID (L2)
 export const CELO_SEPOLIA_CHAIN_ID = 11142220;
+
+// TradingCardGame Contract (placeholder - update after deployment)
+export const TRADING_CARD_GAME_CONTRACT = {
+  address: '0x0000000000000000000000000000000000000000' as const, // TODO: Update after deployment
+  abi: [
+    {
+      inputs: [],
+      name: 'createGame',
+      outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+      stateMutability: 'nonpayable',
+      type: 'function',
+    },
+    {
+      inputs: [{ internalType: 'uint256', name: '_gameId', type: 'uint256' }],
+      name: 'joinGame',
+      outputs: [],
+      stateMutability: 'nonpayable',
+      type: 'function',
+    },
+    {
+      inputs: [{ internalType: 'uint256', name: '_gameId', type: 'uint256' }],
+      name: 'canStartGame',
+      outputs: [
+        { internalType: 'bool', name: 'canStart', type: 'bool' },
+        { internalType: 'string', name: 'reason', type: 'string' },
+      ],
+      stateMutability: 'view',
+      type: 'function',
+    },
+    {
+      inputs: [
+        { internalType: 'uint256', name: '_gameId', type: 'uint256' },
+        { internalType: 'bool', name: '_useSecureRandomness', type: 'bool' },
+      ],
+      name: 'startGame',
+      outputs: [],
+      stateMutability: 'nonpayable',
+      type: 'function',
+    },
+    {
+      inputs: [
+        { internalType: 'uint256', name: '_gameId', type: 'uint256' },
+        { internalType: 'bool', name: '_useSecureRandomness', type: 'bool' },
+      ],
+      name: 'generateCards',
+      outputs: [],
+      stateMutability: 'nonpayable',
+      type: 'function',
+    },
+    {
+      inputs: [
+        { internalType: 'uint256', name: '_gameId', type: 'uint256' },
+        { internalType: 'uint256[3]', name: '_cardNumbers', type: 'uint256[3]' },
+      ],
+      name: 'commitChoices',
+      outputs: [],
+      stateMutability: 'nonpayable',
+      type: 'function',
+    },
+    {
+      inputs: [
+        { internalType: 'uint256', name: '_gameId', type: 'uint256' },
+        { internalType: 'bytes[]', name: '_priceUpdateData', type: 'bytes[]' },
+        { internalType: 'bytes32[]', name: '', type: 'bytes32[]' },
+        { internalType: 'uint256', name: '_updateFee', type: 'uint256' },
+      ],
+      name: 'updatePricesAndResolve',
+      outputs: [],
+      stateMutability: 'payable',
+      type: 'function',
+    },
+    {
+      inputs: [{ internalType: 'uint256', name: '_gameId', type: 'uint256' }],
+      name: 'endGame',
+      outputs: [],
+      stateMutability: 'nonpayable',
+      type: 'function',
+    },
+    {
+      inputs: [{ internalType: 'uint256', name: '_gameId', type: 'uint256' }],
+      name: 'getGameState',
+      outputs: [
+        { internalType: 'uint8', name: 'status', type: 'uint8' },
+        { internalType: 'uint256', name: 'startTime', type: 'uint256' },
+        { internalType: 'uint256', name: 'lobbyDeadline', type: 'uint256' },
+        { internalType: 'uint256', name: 'choiceDeadline', type: 'uint256' },
+        { internalType: 'uint256', name: 'resolutionDeadline', type: 'uint256' },
+        { internalType: 'uint256', name: 'playerCount', type: 'uint256' },
+        { internalType: 'uint256', name: 'cardCount', type: 'uint256' },
+      ],
+      stateMutability: 'view',
+      type: 'function',
+    },
+    {
+      inputs: [{ internalType: 'uint256', name: '_gameId', type: 'uint256' }],
+      name: 'getGamePlayers',
+      outputs: [{ internalType: 'address[]', name: '', type: 'address[]' }],
+      stateMutability: 'view',
+      type: 'function',
+    },
+    {
+      inputs: [{ internalType: 'uint256', name: '_gameId', type: 'uint256' }],
+      name: 'getGameCards',
+      outputs: [{ internalType: 'uint256[]', name: '', type: 'uint256[]' }],
+      stateMutability: 'view',
+      type: 'function',
+    },
+    {
+      inputs: [
+        { internalType: 'uint256', name: '_gameId', type: 'uint256' },
+        { internalType: 'address', name: '_player', type: 'address' },
+      ],
+      name: 'getPlayerChoices',
+      outputs: [
+        { internalType: 'uint256[3]', name: 'selectedCards', type: 'uint256[3]' },
+        { internalType: 'uint256', name: 'committedAt', type: 'uint256' },
+        { internalType: 'bool', name: 'committed', type: 'bool' },
+      ],
+      stateMutability: 'view',
+      type: 'function',
+    },
+    {
+      inputs: [
+        { internalType: 'uint256', name: '_gameId', type: 'uint256' },
+        { internalType: 'uint256', name: '_cardNumber', type: 'uint256' },
+      ],
+      name: 'getPredictionResult',
+      outputs: [
+        { internalType: 'bool', name: 'correct', type: 'bool' },
+        { internalType: 'uint256', name: 'pointsEarned', type: 'uint256' },
+      ],
+      stateMutability: 'view',
+      type: 'function',
+    },
+    {
+      inputs: [{ internalType: 'address', name: '_player', type: 'address' }],
+      name: 'getPlayerScore',
+      outputs: [
+        { internalType: 'uint256', name: 'totalPoints', type: 'uint256' },
+        { internalType: 'uint256', name: 'gamesPlayed', type: 'uint256' },
+        { internalType: 'uint256', name: 'gamesWon', type: 'uint256' },
+      ],
+      stateMutability: 'view',
+      type: 'function',
+    },
+  ] as const,
+} as const;

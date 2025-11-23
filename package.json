@@ -14,7 +14,22 @@
     "contracts:deploy": "turbo run deploy --filter=hardhat",
     "contracts:deploy:alfajores": "turbo run deploy:alfajores --filter=hardhat",
     "contracts:deploy:sepolia": "turbo run deploy:sepolia --filter=hardhat",
-    "contracts:deploy:celo": "turbo run deploy:celo --filter=hardhat"
+    "contracts:deploy:celo": "turbo run deploy:celo --filter=hardhat",
+    "contracts:deploy:game": "turbo run deploy:game --filter=hardhat",
+    "contracts:deploy:game:alfajores": "turbo run deploy:game:alfajores --filter=hardhat",
+    "contracts:deploy:game:sepolia": "turbo run deploy:game:sepolia --filter=hardhat",
+    "contracts:deploy:game:celo": "turbo run deploy:game:celo --filter=hardhat",
+    "contracts:deploy:game:verify:alfajores": "turbo run deploy:game:verify:alfajores --filter=hardhat",
+    "contracts:deploy:game:verify:sepolia": "turbo run deploy:game:verify:sepolia --filter=hardhat",
+    "contracts:deploy:game:verify:celo": "turbo run deploy:game:verify:celo --filter=hardhat",
+    "contracts:verify": "turbo run verify --filter=hardhat",
+    "contracts:verify:alfajores": "turbo run verify:alfajores --filter=hardhat",
+    "contracts:verify:sepolia": "turbo run verify:sepolia --filter=hardhat",
+    "contracts:verify:celo": "turbo run verify:celo --filter=hardhat",
+    "contracts:verify:game": "turbo run verify:game --filter=hardhat",
+    "contracts:verify:game:alfajores": "turbo run verify:game:alfajores --filter=hardhat",
+    "contracts:verify:game:sepolia": "turbo run verify:game:sepolia --filter=hardhat",
+    "contracts:verify:game:celo": "turbo run verify:game:celo --filter=hardhat"
   },
   "devDependencies": {
     "@types/node": "^20.8.0",

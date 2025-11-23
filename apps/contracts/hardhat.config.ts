@@ -2,6 +2,11 @@ import type { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox-viem";
 import "dotenv/config";
 
+// Disable telemetry prompt (must be set before Hardhat initializes)
+if (!process.env.HARDHAT_DISABLE_TELEMETRY) {
+  process.env.HARDHAT_DISABLE_TELEMETRY = "1";
+}
+
 const config: HardhatUserConfig = {
   solidity: {
     version: "0.8.28",
@@ -76,6 +81,9 @@ const config: HardhatUserConfig = {
   gasReporter: {
     enabled: process.env.REPORT_GAS !== undefined,
     currency: "USD",
+  },
+  sourcify: {
+    enabled: true
   },
 };
 

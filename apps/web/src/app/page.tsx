@@ -5,30 +5,33 @@ import { useAccount, useConnect } from "wagmi";
 import { CardGame } from "@/components/card-game";
 import { ResultsDisplay } from "@/components/results-display";
 import { Leaderboard } from "@/components/leaderboard";
-import { Card } from "@/types/card";
+import { Lobby } from "@/components/lobby";
+import { GameStatusDisplay } from "@/components/game-status";
+import { useGameState, GameStatus } from "@/hooks/use-trading-game";
 
 export default function Home() {
   const { context, isMiniAppReady } = useMiniApp();
   const [mounted, setMounted] = useState(false);
-  
+  const [currentGameId, setCurrentGameId] = useState<bigint | undefined>(undefined);
+
   // Wait for component to mount (client-side only) to avoid hydration warnings
   useEffect(() => {
     setMounted(true);
   }, []);
-  
+
   // Wallet connection hooks
   const { address, isConnected, isConnecting } = useAccount();
   const { connect, connectors } = useConnect();
   const hasAttemptedConnectRef = useRef(false);
-  
+
   // Check if we're on localhost (not in Farcaster)
-  const isLocalhost = typeof window !== 'undefined' && 
-    (window.location.hostname === 'localhost' || 
-     window.location.hostname === '127.0.0.1');
-  
+  const isLocalhost =
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+
   // Only auto-connect if we have Farcaster context (actually in Farcaster environment)
   const hasFarcasterContext = !!context;
-  
+
   // Auto-connect wallet when miniapp is ready (only if in Farcaster)
   useEffect(() => {
     // Only auto-connect if:
@@ -38,25 +41,25 @@ export default function Home() {
     if (isLocalhost || !hasFarcasterContext) {
       return;
     }
-    
+
     if (
       mounted &&
-      isMiniAppReady && 
-      !isConnected && 
-      !isConnecting && 
-      !hasAttemptedConnectRef.current && 
+      isMiniAppReady &&
+      !isConnected &&
+      !isConnecting &&
+      !hasAttemptedConnectRef.current &&
       connectors.length > 0
     ) {
       // Try to find the Farcaster connector
-      // The connector ID might be 'farcaster' or something else
-      const farcasterConnector = connectors.find(c => 
-        c.id === 'farcaster' || 
-        c.id === 'farcasterMiniApp' ||
-        c.name?.toLowerCase().includes('farcaster')
+      const farcasterConnector = connectors.find(
+        (c) =>
+          c.id === "farcaster" ||
+          c.id === "farcasterMiniApp" ||
+          c.name?.toLowerCase().includes("farcaster")
       );
-      
+
       if (farcasterConnector) {
-        console.log('🔗 Auto-connecting to Farcaster wallet...', farcasterConnector.id);
+        console.log("🔗 Auto-connecting to Farcaster wallet...", farcasterConnector.id);
         hasAttemptedConnectRef.current = true;
         requestAnimationFrame(() => {
           setTimeout(() => {
@@ -64,33 +67,41 @@ export default function Home() {
           }, 200);
         });
       } else {
-        console.warn('⚠️ Farcaster connector not found. Available connectors:', connectors.map(c => ({ id: c.id, name: c.name })));
+        console.warn(
+          "⚠️ Farcaster connector not found. Available connectors:",
+          connectors.map((c) => ({ id: c.id, name: c.name }))
+        );
       }
     }
-  }, [mounted, isMiniAppReady, isConnected, isConnecting, connectors, connect, isLocalhost, hasFarcasterContext, context]);
-  
+  }, [
+    mounted,
+    isMiniAppReady,
+    isConnected,
+    isConnecting,
+    connectors,
+    connect,
+    isLocalhost,
+    hasFarcasterContext,
+    context,
+  ]);
+
+  // Get current game state to determine what to show
+  const { gameState } = useGameState(currentGameId);
+
+  // Handle game joined
+  const handleGameJoined = (gameId: bigint) => {
+    setCurrentGameId(gameId);
+  };
+
   // Extract user data from context
   const user = context?.user;
   const displayName = user?.displayName || user?.username || "User";
-  
-  // Card selection state
-  const [selectedCards, setSelectedCards] = useState<Card[]>([]);
-  
-  // Handle card selection
-  const handleCardsSelected = (cards: Card[]) => {
-    setSelectedCards(cards);
-    console.log("Cards selected:", cards);
-  };
 
-  // Handle proceed action
-  const handleProceed = (cards: Card[]) => {
-    console.log("Proceeding with cards:", cards);
-    // TODO: Additional logic when contract is ready
-    // - Update prices via Pyth
-    // - Submit to contract
-    // - Navigate to results
-  };
-  
+  // Determine what phase we're in
+  const showLobby = !currentGameId || gameState?.status === GameStatus.LOBBY;
+  const showGame = currentGameId && gameState && gameState.status !== GameStatus.LOBBY;
+  const showResults = currentGameId && gameState?.status === GameStatus.ENDED;
+
   // Don't render until mounted and ready (prevents hydration warnings)
   if (!mounted || !isMiniAppReady) {
     return (
@@ -104,7 +115,7 @@ export default function Home() {
       </main>
     );
   }
-  
+
   return (
     <main className="flex-1">
       <section className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8">
@@ -113,9 +124,7 @@ export default function Home() {
           {context?.user && (
             <div className="text-center">
               <div className="inline-flex items-center gap-2 bg-white/30 backdrop-blur-sm px-4 py-2 rounded-full">
-                <span className="text-sm text-gray-700">
-                  {displayName}
-                </span>
+                <span className="text-sm text-gray-700">{displayName}</span>
               </div>
             </div>
           )}
@@ -137,18 +146,27 @@ export default function Home() {
             </div>
           )}
 
-          {/* Card Game Component */}
-          <CardGame 
-            onCardsSelected={handleCardsSelected} 
-            onProceed={handleProceed}
-            maxSelections={3}
-            cardCount={10}
-          />
+          {/* Lobby Component - Show when no game or game in LOBBY */}
+          {showLobby && <Lobby currentGameId={currentGameId} onGameJoined={handleGameJoined} />}
 
-          {/* Results Display */}
-          <ResultsDisplay />
+          {/* Game Status Display - Show when game is active */}
+          {showGame && <GameStatusDisplay gameId={currentGameId} />}
 
-          {/* Leaderboard */}
+          {/* Card Game Component - Show when game is ACTIVE or CHOICE */}
+          {showGame && (
+            <CardGame
+              gameId={currentGameId}
+              maxSelections={3}
+              onChoicesCommitted={() => {
+                console.log("Choices committed!");
+              }}
+            />
+          )}
+
+          {/* Results Display - Show when game has ended */}
+          {showResults && <ResultsDisplay gameId={currentGameId} />}
+
+          {/* Leaderboard - Always show */}
           <Leaderboard limit={10} />
         </div>
       </section>
