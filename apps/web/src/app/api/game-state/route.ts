@@ -23,9 +23,27 @@ export async function GET(request: NextRequest) {
     const gameId = searchParams.get('gameId');
     const playerAddress = searchParams.get('playerAddress');
 
-    if (!gameId) {
+    // Validate gameId - reject undefined, null, empty string, or "0"
+    if (!gameId || gameId === 'undefined' || gameId === 'null' || gameId === '' || gameId === '0') {
       return NextResponse.json(
-        { error: 'gameId is required' },
+        { error: 'Invalid or missing gameId parameter' },
+        { status: 400 }
+      );
+    }
+    
+    // Try to parse gameId to ensure it's a valid number
+    let gameIdBigInt: bigint;
+    try {
+      gameIdBigInt = BigInt(gameId);
+      if (gameIdBigInt <= 0n) {
+        return NextResponse.json(
+          { error: 'gameId must be greater than 0' },
+          { status: 400 }
+        );
+      }
+    } catch (err) {
+      return NextResponse.json(
+        { error: 'gameId must be a valid number' },
         { status: 400 }
       );
     }
@@ -35,7 +53,7 @@ export async function GET(request: NextRequest) {
       transport: http(RPC_URL),
     });
 
-    const gameIdBigInt = BigInt(gameId);
+    // gameIdBigInt is already validated and set above
 
     // Call all contract functions in parallel
     const [gameState, players, cards, playerChoice] = await Promise.all([

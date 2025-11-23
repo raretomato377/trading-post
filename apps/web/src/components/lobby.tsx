@@ -161,6 +161,9 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
     console.log('🎮 [Lobby] chainId:', chainId);
     console.log('🎮 [Lobby] expected chainId:', CELO_MAINNET_CHAIN_ID);
     console.log('🎮 [Lobby] balance:', balance ? `${formatUnits(balance.value, balance.decimals)} ${balance.symbol}` : 'loading...');
+    console.log('🎮 [Lobby] hasActiveGame:', hasActiveGame);
+    console.log('🎮 [Lobby] activeGameId:', activeGameId?.toString());
+    console.log('🎮 [Lobby] isCheckingActiveGame:', isCheckingActiveGame);
     
     if (!isConnected) {
       console.warn('🎮 [Lobby] Wallet not connected');
@@ -180,7 +183,23 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
       return;
     }
     
-    console.log('🎮 [Lobby] Calling createGame()...');
+    if (hasActiveGame) {
+      console.warn('🎮 [Lobby] Already in active game:', activeGameId?.toString());
+      alert(`You are already in an active game (Game ID: ${activeGameId?.toString()}). Please finish that game before creating a new one.`);
+      return;
+    }
+    
+    if (isCheckingActiveGame) {
+      console.warn('🎮 [Lobby] Still checking active game status');
+      alert("Please wait while we check your current game status...");
+      return;
+    }
+    
+    console.log('🎮 [Lobby] All checks passed, calling createGame()...');
+    console.log('🎮 [Lobby] If you see "Insufficient balance" in wallet popup, it might be:');
+    console.log('  1. Wallet checking balance on wrong chain');
+    console.log('  2. Contract reverting (check if already in game)');
+    console.log('  3. Gas estimation failing');
     createGame();
   };
 

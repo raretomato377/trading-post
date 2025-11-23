@@ -19,28 +19,7 @@ export default function Home() {
   }, []);
 
   // Wallet connection hooks
-  // Note: useAccount might throw if connector doesn't support getChainId
-  // We'll handle this gracefully
-  let accountData: { address?: `0x${string}`; isConnected: boolean; isConnecting: boolean } = {
-    isConnected: false,
-    isConnecting: false,
-  };
-  try {
-    const account = useAccount();
-    accountData = {
-      address: account.address,
-      isConnected: account.isConnected,
-      isConnecting: account.isConnecting,
-    };
-  } catch (error: any) {
-    // If getChainId error, log it but continue
-    if (error?.message?.includes('getChainId')) {
-      console.warn('⚠️ Connector getChainId error (non-fatal):', error);
-    } else {
-      throw error; // Re-throw other errors
-    }
-  }
-  const { address, isConnected, isConnecting } = accountData;
+  const { address, isConnected, isConnecting } = useAccount();
   const { connect, connectors } = useConnect();
   const hasAttemptedConnectRef = useRef(false);
 
@@ -116,13 +95,32 @@ export default function Home() {
   const displayName = user?.displayName || user?.username || "User";
 
   // Determine what phase we're in
-  // If player has an active game that's not ENDED, show that game (not the lobby)
-  // If player has an active game in LOBBY, still show the game (they're part of it)
-  // Otherwise, show lobby if no game or game is in LOBBY and player is not in it
-  const hasActiveNonEndedGame = currentGameId && gameState && gameState.status !== GameStatus.ENDED;
-  const showLobby = !hasActiveNonEndedGame && (!currentGameId || gameState?.status === GameStatus.LOBBY);
-  const showGame = currentGameId && gameState && gameState.status !== GameStatus.ENDED;
-  const showResults = currentGameId && gameState?.status === GameStatus.ENDED;
+  // If player has an active game (even in LOBBY), show that game (not the lobby)
+  // Only show lobby if player has NO active game
+  // Show game if player has an active game that's not ENDED (or if gameState is still loading)
+  // Show results if player's game has ended
+  const hasActiveGame = currentGameId && currentGameId > 0n; // Player is in a game
+  
+  // Only show lobby if player has NO active game at all
+  const showLobby = !hasActiveGame;
+  // Show game if player has an active game that's not ended (including LOBBY state)
+  // Also show game if gameState is still loading (we know they're in a game)
+  const showGame = hasActiveGame && (!gameState || gameState.status !== GameStatus.ENDED);
+  // Show results if player's game has ended
+  const showResults = hasActiveGame && gameState?.status === GameStatus.ENDED;
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('🎮 [Page] Game display logic:', {
+      currentGameId: currentGameId?.toString(),
+      hasActiveGame,
+      gameStateStatus: gameState?.status,
+      showLobby,
+      showGame,
+      showResults,
+      isCheckingActiveGame,
+    });
+  }, [currentGameId, hasActiveGame, gameState?.status, showLobby, showGame, showResults, isCheckingActiveGame]);
 
   // Don't render until mounted and ready (prevents hydration warnings)
   if (!mounted || !isMiniAppReady) {

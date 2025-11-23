@@ -1,4 +1,4 @@
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useEstimateGas } from "wagmi";
 import { TRADING_CARD_GAME_CONTRACT, CELO_MAINNET_CHAIN_ID, POLLING_INTERVAL_MS } from "@/config/contracts";
 import { parseAbiItem, decodeEventLog } from "viem";
 import { useWatchContractEvent } from "wagmi";
@@ -587,7 +587,8 @@ export function useGameState(gameId: bigint | undefined) {
   const [error, setError] = useState<Error | null>(null);
 
   const fetchGameState = useCallback(async () => {
-    if (!gameId || !isPageVisible) {
+    // Don't fetch if gameId is undefined, 0, or page is not visible
+    if (!gameId || gameId === 0n || !isPageVisible) {
       setGameState(undefined);
       return;
     }
@@ -628,14 +629,24 @@ export function useGameState(gameId: bigint | undefined) {
   }, [gameId, isPageVisible]);
 
   useEffect(() => {
-    if (!gameId || !isPageVisible) {
+    // Don't poll if gameId is undefined or page is not visible
+    if (!gameId || gameId === 0n || !isPageVisible) {
+      // Clear state when gameId becomes undefined
+      if (!gameId || gameId === 0n) {
+        setGameState(undefined);
+        setIsLoading(false);
+        setError(null);
+      }
       return;
     }
 
+    // Fetch immediately when gameId is set
     fetchGameState();
 
+    // Poll at configured interval
     const interval = setInterval(() => {
-      if (isPageVisible) {
+      // Double-check gameId is still valid before polling
+      if (gameId && gameId > 0n && isPageVisible) {
         fetchGameState();
       }
     }, POLLING_INTERVAL_MS);
