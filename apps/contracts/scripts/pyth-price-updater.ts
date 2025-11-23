@@ -6,7 +6,12 @@ import { execSync } from "child_process";
 dotenv.config();
 
 // Configuration - hardcoded values
-const RPC_URL = "https://forno.celo.org"; // Celo mainnet
+// Try multiple RPC endpoints for better reliability
+const RPC_URLS = [
+  "https://forno.celo.org",
+  // "https://rpc.ankr.com/celo",
+  // "https://1rpc.io/celo",
+];
 const PYTH_CONTRACT_ADDRESS = "0xff1a0f4744e8582DF1aE09D5611b887B6a12925C"; // Celo mainnet
 const HERMES_URL = "https://hermes.pyth.network/v2/updates/price/latest";
 const UPDATE_INTERVAL = 60 * 1000; // 60 seconds in milliseconds

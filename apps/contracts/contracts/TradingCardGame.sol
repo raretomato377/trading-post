@@ -115,8 +115,9 @@ contract TradingCardGame {
 
     // ============ Constructor ============
 
-    constructor(address _pythAddress) {
-        pyth = IPyth(_pythAddress);
+    constructor() {
+        // Pyth contract address on Celo mainnet
+        pyth = IPyth(0xff1a0f4744e8582DF1aE09D5611b887B6a12925C);
         nextGameId = 1;
     }
 

@@ -38,7 +38,7 @@ async function main() {
     process.exit(1);
   }
 
-  const validContracts = ["Lock", "RandomNumbers", "HyperlaneBase", "HyperlaneCelo", "ExampleEntropyConsumer"];
+  const validContracts = ["Lock", "RandomNumbers", "HyperlaneBase", "HyperlaneCelo", "ExampleEntropyConsumer", "TradingCardGame"];
   if (!validContracts.includes(contractName)) {
     console.error(`Unknown contract: ${contractName}`);
     console.log("Available contracts:", validContracts.join(", "));
@@ -126,6 +126,10 @@ async function main() {
     console.log("Deploying ExampleEntropyConsumer contract...");
     console.log("HyperlaneCelo Contract:", hyperlaneCeloAddress);
     contract = await factory.deploy(hyperlaneCeloAddress);
+  } else if (contractName === "TradingCardGame") {
+    console.log("Deploying TradingCardGame contract...");
+    console.log("Pyth Contract: 0xff1a0f4744e8582DF1aE09D5611b887B6a12925C (Celo mainnet)");
+    contract = await factory.deploy();
   }
 
   console.log("Waiting for deployment...");
