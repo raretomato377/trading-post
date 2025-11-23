@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAccount } from "wagmi";
-import { useCreateGame, useJoinGame, useGameState, GameStatus, useNextGameId } from "@/hooks/use-trading-game";
+import { useCreateGame, useJoinGame, useGameState, GameStatus, useNextGameId, usePlayerActiveGame, useAvailableLobbies } from "@/hooks/use-trading-game";
 import { CELO_MAINNET_CHAIN_ID } from "@/config/contracts";
 import { formatTimeRemaining } from "@/hooks/use-game-state";
 
@@ -15,14 +15,31 @@ interface LobbyProps {
 export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps) {
   const { address, isConnected, chainId } = useAccount();
   const { createGame, isPending: isCreating, isSuccess: createSuccess, hash, error: createError, receipt } = useCreateGame();
-  const { joinGame, isPending: isJoining } = useJoinGame(currentGameId);
-  const { gameState, isLoading } = useGameState(currentGameId);
   const { nextGameId } = useNextGameId();
+  const { hasActiveGame, activeGameId, isChecking: isCheckingActiveGame } = usePlayerActiveGame(address);
+  const { availableLobbies, isLoading: isLoadingLobbies, hasAvailableLobbies } = useAvailableLobbies(address);
+  
+  // Use the first available lobby if no currentGameId is set
+  const lobbyToJoin = currentGameId || (availableLobbies.length > 0 ? availableLobbies[0].gameId : undefined);
+  const { joinGame, isPending: isJoining } = useJoinGame(lobbyToJoin);
   
   const isWrongChain = isConnected && chainId !== CELO_MAINNET_CHAIN_ID;
 
   const [localGameId, setLocalGameId] = useState<bigint | undefined>(currentGameId);
   const [createdGameId, setCreatedGameId] = useState<bigint | undefined>(undefined);
+  
+  // Sync localGameId with currentGameId prop when it changes from parent
+  useEffect(() => {
+    if (currentGameId && currentGameId !== localGameId) {
+      console.log('🎮 [Lobby] Syncing localGameId with currentGameId:', currentGameId.toString());
+      setLocalGameId(currentGameId);
+    }
+  }, [currentGameId, localGameId]);
+  
+  // Use localGameId or currentGameId for game state (prioritize localGameId if it exists)
+  // This ensures we fetch the new game's state immediately after creation
+  const gameIdForState = localGameId || currentGameId;
+  const { gameState, isLoading, refetch } = useGameState(gameIdForState);
 
   // Log all state changes
   useEffect(() => {
@@ -54,9 +71,14 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
         if (onGameStarted) {
           onGameStarted(newGameId);
         }
+        // Immediately refetch game state for the new game
+        setTimeout(() => {
+          console.log('🎮 [Lobby] Refetching game state for new game:', newGameId.toString());
+          refetch();
+        }, 1000); // Wait 1 second for the transaction to be indexed
       }
     }
-  }, [createSuccess, nextGameId, createdGameId, onGameStarted]);
+  }, [createSuccess, nextGameId, createdGameId, onGameStarted, refetch]);
 
   const handleCreateGame = () => {
     console.log('🎮 [Lobby] handleCreateGame called');
@@ -78,18 +100,20 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
       alert("Please connect your wallet first");
       return;
     }
-    if (!currentGameId) {
+    const gameIdToJoin = currentGameId || (availableLobbies.length > 0 ? availableLobbies[0].gameId : undefined);
+    if (!gameIdToJoin) {
       alert("No game available to join");
       return;
     }
     joinGame();
     if (onGameJoined) {
-      onGameJoined(currentGameId);
+      onGameJoined(gameIdToJoin);
     }
   };
 
   // If there's a current game in LOBBY state, show join option
-  const canJoin = currentGameId && gameState?.status === GameStatus.LOBBY;
+  // Or if there are available lobbies, show join option
+  const canJoin = (gameIdForState && gameState?.status === GameStatus.LOBBY) || hasAvailableLobbies;
 
   // Calculate time remaining
   const timeRemaining = gameState?.lobbyDeadline
@@ -110,26 +134,51 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
       ) : canJoin ? (
         <div className="space-y-4">
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h3 className="text-lg font-semibold text-blue-900 mb-2">Game Available</h3>
-            <p className="text-sm text-blue-700 mb-4">
-              A game is in the lobby. Join now to participate!
-            </p>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <p className="text-sm text-gray-600">Time remaining:</p>
-                <p className="text-2xl font-bold text-blue-600">{timeRemaining}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Players:</p>
-                <p className="text-2xl font-bold text-blue-600">{Number(gameState?.playerCount || 0n)}</p>
-              </div>
-            </div>
+            <h3 className="text-lg font-semibold text-blue-900 mb-2">
+              {gameIdForState && gameState?.status === GameStatus.LOBBY 
+                ? "Game Available" 
+                : "Available Lobbies"}
+            </h3>
+            {gameIdForState && gameState?.status === GameStatus.LOBBY ? (
+              <>
+                <p className="text-sm text-blue-700 mb-4">
+                  A game is in the lobby. Join now to participate!
+                </p>
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Time remaining:</p>
+                    <p className="text-2xl font-bold text-blue-600">{timeRemaining}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Players:</p>
+                    <p className="text-2xl font-bold text-blue-600">{Number(gameState?.playerCount || 0n)}</p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-blue-700 mb-4">
+                  {availableLobbies.length} lobby{availableLobbies.length !== 1 ? 'ies' : 'y'} available to join!
+                </p>
+                {availableLobbies.length > 0 && (
+                  <div className="mb-4 space-y-2">
+                    {availableLobbies.slice(0, 3).map((lobby) => (
+                      <div key={lobby.gameId.toString()} className="flex items-center justify-between p-2 bg-white rounded">
+                        <span className="text-sm text-gray-700">Game #{lobby.gameId.toString()}</span>
+                        <span className="text-sm text-gray-600">{lobby.playerCount} player{lobby.playerCount !== 1 ? 's' : ''}</span>
+                        <span className="text-sm text-gray-600">{formatTimeRemaining(lobby.timeRemaining)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
             <button
               onClick={handleJoinGame}
-              disabled={isJoining || !isConnected}
+              disabled={isJoining || !isConnected || (hasActiveGame && activeGameId !== gameIdForState) || isCheckingActiveGame || isLoadingLobbies}
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
             >
-              {isJoining ? "Joining..." : "Join Game"}
+              {isJoining ? "Joining..." : isCheckingActiveGame || isLoadingLobbies ? "Checking..." : (hasActiveGame && activeGameId !== gameIdForState) ? "Already in Another Game" : "Join Lobby"}
             </button>
           </div>
         </div>
@@ -143,10 +192,10 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
             </p>
             <button
               onClick={handleCreateGame}
-              disabled={isCreating || !isConnected}
+              disabled={isCreating || !isConnected || hasActiveGame || isCheckingActiveGame}
               className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
             >
-              {isCreating ? "Creating..." : "Create New Game"}
+              {isCreating ? "Creating..." : isCheckingActiveGame ? "Checking..." : hasActiveGame ? "Already in Game" : "Create New Game"}
             </button>
             
             {/* Debug info */}
@@ -174,6 +223,18 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
         <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <p className="text-sm text-yellow-800">
             ⚠️ Please connect your wallet to start or join a game.
+          </p>
+        </div>
+      )}
+
+      {hasActiveGame && activeGameId && activeGameId !== gameIdForState && (
+        <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+          <p className="text-sm text-orange-800 font-semibold mb-1">
+            ⚠️ Already in Active Game
+          </p>
+          <p className="text-sm text-orange-700">
+            You are already participating in Game ID: <strong>{activeGameId.toString()}</strong>. 
+            Please finish that game before creating or joining a new one.
           </p>
         </div>
       )}

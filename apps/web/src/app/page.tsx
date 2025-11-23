@@ -7,7 +7,7 @@ import { ResultsDisplay } from "@/components/results-display";
 import { Leaderboard } from "@/components/leaderboard";
 import { Lobby } from "@/components/lobby";
 import { GameStatusDisplay } from "@/components/game-status";
-import { useGameState, GameStatus } from "@/hooks/use-trading-game";
+import { useGameState, GameStatus, usePlayerActiveGame } from "@/hooks/use-trading-game";
 
 export default function Home() {
   const { context, isMiniAppReady } = useMiniApp();
@@ -85,8 +85,27 @@ export default function Home() {
     context,
   ]);
 
+  // Get player's active game from contract
+  const { activeGameId: playerActiveGameId, isChecking: isCheckingActiveGame } = usePlayerActiveGame(address);
+
   // Get current game state to determine what to show
   const { gameState } = useGameState(currentGameId);
+
+  // Automatically set currentGameId if player has an active game
+  // This ensures players always see their active game when they log in
+  useEffect(() => {
+    if (playerActiveGameId && playerActiveGameId !== currentGameId) {
+      console.log('🎮 [Home] Player has active game, setting currentGameId:', playerActiveGameId.toString());
+      setCurrentGameId(playerActiveGameId);
+    } else if (!playerActiveGameId && currentGameId && !isCheckingActiveGame) {
+      // If player no longer has an active game and the current game has ended, clear currentGameId
+      // This allows them to see the lobby again
+      if (gameState?.status === GameStatus.ENDED) {
+        console.log('🎮 [Home] Player no longer has active game, clearing currentGameId');
+        setCurrentGameId(undefined);
+      }
+    }
+  }, [playerActiveGameId, currentGameId, isCheckingActiveGame, gameState?.status]);
 
   // Handle game joined
   const handleGameJoined = (gameId: bigint) => {
@@ -98,8 +117,12 @@ export default function Home() {
   const displayName = user?.displayName || user?.username || "User";
 
   // Determine what phase we're in
-  const showLobby = !currentGameId || gameState?.status === GameStatus.LOBBY;
-  const showGame = currentGameId && gameState && gameState.status !== GameStatus.LOBBY;
+  // If player has an active game that's not ENDED, show that game (not the lobby)
+  // If player has an active game in LOBBY, still show the game (they're part of it)
+  // Otherwise, show lobby if no game or game is in LOBBY and player is not in it
+  const hasActiveNonEndedGame = playerActiveGameId && gameState && gameState.status !== GameStatus.ENDED;
+  const showLobby = !hasActiveNonEndedGame && (!currentGameId || gameState?.status === GameStatus.LOBBY);
+  const showGame = currentGameId && gameState && gameState.status !== GameStatus.ENDED;
   const showResults = currentGameId && gameState?.status === GameStatus.ENDED;
 
   // Don't render until mounted and ready (prevents hydration warnings)

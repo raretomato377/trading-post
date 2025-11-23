@@ -86,6 +86,9 @@ contract TradingCardGame {
     mapping(uint256 => Game) public games;
     mapping(address => PlayerScore) public playerScores;
     address[] public leaderboard; // Top players by total points
+    
+    // Track which game each player is currently in (0 means not in any game)
+    mapping(address => uint256) public playerActiveGame;
 
     // Asset to Pyth price ID mapping
     // For simplicity, we'll use a mapping from asset index to price ID
@@ -134,9 +137,22 @@ contract TradingCardGame {
     /**
      * @notice Create a new game - anyone can call this
      * @dev Creates a new game in LOBBY state with 60s join window
+     * @dev Enforces that a player can only be in one active game at a time
      * @return gameId The ID of the newly created game
      */
     function createGame() external returns (uint256) {
+        // Check if player is already in an active game
+        uint256 currentGameId = playerActiveGame[msg.sender];
+        if (currentGameId > 0) {
+            Game storage currentGame = games[currentGameId];
+            require(
+                currentGame.status == GameStatus.ENDED,
+                "Already in an active game"
+            );
+            // Clear the mapping if the game has ended
+            playerActiveGame[msg.sender] = 0;
+        }
+
         uint256 gameId = nextGameId++;
         Game storage game = games[gameId];
 
@@ -145,6 +161,9 @@ contract TradingCardGame {
         game.startTime = block.timestamp;
         game.lobbyDeadline = block.timestamp + LOBBY_DURATION;
         game.players.push(msg.sender);
+        
+        // Track that this player is now in this game
+        playerActiveGame[msg.sender] = gameId;
 
         emit GameStarted(gameId, msg.sender);
 
@@ -154,6 +173,7 @@ contract TradingCardGame {
     /**
      * @notice Join an existing game in LOBBY state
      * @param _gameId The game ID to join
+     * @dev Enforces that a player can only be in one active game at a time
      */
     function joinGame(
         uint256 _gameId
@@ -161,12 +181,28 @@ contract TradingCardGame {
         Game storage game = games[_gameId];
         require(block.timestamp <= game.lobbyDeadline, "Lobby closed");
 
-        // Check if player already joined
+        // Check if player already joined this game
         for (uint256 i = 0; i < game.players.length; i++) {
             require(game.players[i] != msg.sender, "Already joined");
         }
 
+        // Check if player is already in a different active game
+        uint256 currentGameId = playerActiveGame[msg.sender];
+        if (currentGameId > 0 && currentGameId != _gameId) {
+            Game storage currentGame = games[currentGameId];
+            require(
+                currentGame.status == GameStatus.ENDED,
+                "Already in an active game"
+            );
+            // Clear the mapping if the game has ended
+            playerActiveGame[msg.sender] = 0;
+        }
+
         game.players.push(msg.sender);
+        
+        // Track that this player is now in this game
+        playerActiveGame[msg.sender] = _gameId;
+        
         emit PlayerJoined(_gameId, msg.sender);
     }
 
@@ -397,6 +433,13 @@ contract TradingCardGame {
 
         // Update game status
         game.status = GameStatus.ENDED;
+        
+        // Clear player active game mappings for all players in this game
+        for (uint256 i = 0; i < game.players.length; i++) {
+            if (playerActiveGame[game.players[i]] == _gameId) {
+                playerActiveGame[game.players[i]] = 0;
+            }
+        }
 
         emit GameEnded(_gameId);
     }

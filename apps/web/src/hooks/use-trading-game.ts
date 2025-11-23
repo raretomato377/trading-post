@@ -44,14 +44,25 @@ export interface PlayerScore {
  * Hook to create a new game
  */
 export function useCreateGame() {
-  const { chainId } = useAccount();
+  const { chainId, address } = useAccount();
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({
     hash,
   });
+  const { hasActiveGame, activeGameId, isChecking } = usePlayerActiveGame(address);
 
   const createGame = async () => {
+    // Check if player is already in an active game
+    if (hasActiveGame && activeGameId) {
+      alert(`You are already in an active game (Game ID: ${activeGameId.toString()}). Please finish that game before creating a new one.`);
+      return;
+    }
+
+    if (isChecking) {
+      alert("Please wait while we check your current game status...");
+      return;
+    }
     console.log('🎮 [createGame] Starting createGame...');
     console.log('🎮 [createGame] Contract address:', TRADING_CARD_GAME_CONTRACT.address);
     console.log('🎮 [createGame] Target Chain ID:', CELO_MAINNET_CHAIN_ID);
@@ -144,14 +155,25 @@ export function useCreateGame() {
  * Hook to join an existing game
  */
 export function useJoinGame(gameId: bigint | undefined) {
-  const { chainId } = useAccount();
+  const { chainId, address } = useAccount();
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
   });
+  const { hasActiveGame, activeGameId, isChecking } = usePlayerActiveGame(address);
 
   const joinGame = async () => {
+    // Check if player is already in an active game (and it's not the game they're trying to join)
+    if (hasActiveGame && activeGameId && activeGameId !== gameId) {
+      alert(`You are already in an active game (Game ID: ${activeGameId.toString()}). Please finish that game before joining another one.`);
+      return;
+    }
+
+    if (isChecking) {
+      alert("Please wait while we check your current game status...");
+      return;
+    }
     // Check if we need to switch chains
     if (chainId !== CELO_MAINNET_CHAIN_ID) {
       console.log('🎮 [joinGame] Chain mismatch detected. Switching to Celo Mainnet...');
@@ -566,6 +588,120 @@ export function useNextGameId() {
     nextGameId: data as bigint | undefined,
     isLoading,
     error,
+  };
+}
+
+/**
+ * Hook to get the player's active game from the contract
+ * Uses the contract's getPlayerActiveGame function for accurate tracking
+ */
+export function usePlayerActiveGame(playerAddress: `0x${string}` | undefined) {
+  const isPageVisible = usePageVisibility();
+  const { data, isLoading, error, refetch } = useReadContract({
+    address: TRADING_CARD_GAME_CONTRACT.address,
+    abi: TRADING_CARD_GAME_CONTRACT.abi,
+    functionName: "getPlayerActiveGame",
+    args: playerAddress ? [playerAddress] : undefined,
+    chainId: CELO_MAINNET_CHAIN_ID,
+    query: {
+      enabled: !!playerAddress && isPageVisible,
+      refetchInterval: isPageVisible ? POLLING_INTERVAL_MS : false,
+    },
+  });
+
+  const activeGameId = data && data > 0n ? data as bigint : undefined;
+
+  return {
+    activeGameId,
+    isChecking: isLoading,
+    hasActiveGame: activeGameId !== undefined,
+    error,
+    refetch,
+  };
+}
+
+/**
+ * Hook to find available lobbies (games in LOBBY state that player can join)
+ * Checks recent games (last 20 games) to find available lobbies
+ */
+export function useAvailableLobbies(playerAddress: `0x${string}` | undefined) {
+  const { nextGameId } = useNextGameId();
+  const [availableLobbies, setAvailableLobbies] = useState<Array<{ gameId: bigint; playerCount: number; timeRemaining: number }>>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!nextGameId || nextGameId === 1n) {
+      setAvailableLobbies([]);
+      return;
+    }
+
+    setIsLoading(true);
+    
+    const findLobbies = async () => {
+      try {
+        const startGameId = nextGameId > 20n ? nextGameId - 20n : 1n;
+        const endGameId = nextGameId - 1n;
+        
+        const lobbyPromises: Promise<{ gameId: bigint; playerCount: number; timeRemaining: number } | null>[] = [];
+        
+        for (let gameId = endGameId; gameId >= startGameId; gameId--) {
+          lobbyPromises.push(
+            fetch(`/api/game-state?gameId=${gameId}${playerAddress ? `&playerAddress=${playerAddress}` : ''}`)
+              .then(async (response) => {
+                if (!response.ok) return null;
+                
+                const gameData = await response.json();
+                
+                // Check if game is in LOBBY state
+                if (gameData.gameState && Number(gameData.gameState.status) === 0) { // LOBBY = 0
+                  const now = Math.floor(Date.now() / 1000);
+                  const deadline = Number(gameData.gameState.lobbyDeadline);
+                  const timeRemaining = Math.max(0, deadline - now);
+                  
+                  // Check if player is already in this game
+                  const playerList = gameData.players || [];
+                  const isInGame = playerAddress ? playerList.some((p: string) => 
+                    p.toLowerCase() === playerAddress.toLowerCase()
+                  ) : false;
+                  
+                  // Only include if player is not already in it and lobby is still open
+                  if (!isInGame && timeRemaining > 0) {
+                    return {
+                      gameId,
+                      playerCount: Number(gameData.gameState.playerCount),
+                      timeRemaining,
+                    };
+                  }
+                }
+                return null;
+              })
+              .catch(() => null)
+          );
+        }
+        
+        const results = await Promise.all(lobbyPromises);
+        const lobbies = results.filter((lobby): lobby is { gameId: bigint; playerCount: number; timeRemaining: number } => 
+          lobby !== null
+        );
+        
+        // Sort by newest first
+        lobbies.sort((a, b) => Number(b.gameId - a.gameId));
+        
+        setAvailableLobbies(lobbies);
+      } catch (err) {
+        console.error('Error finding lobbies:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    findLobbies();
+  }, [nextGameId, playerAddress]);
+
+  return {
+    availableLobbies,
+    isLoading,
+    hasAvailableLobbies: availableLobbies.length > 0,
   };
 }
 
