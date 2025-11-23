@@ -51,7 +51,7 @@ export const CELO_SEPOLIA_CHAIN_ID = 11142220;
 
 // TradingCardGame Contract (placeholder - update after deployment)
 export const TRADING_CARD_GAME_CONTRACT = {
-  address: '0x0000000000000000000000000000000000000000' as const, // TODO: Update after deployment
+  address: '0x40df882537ccFA98e39715C9f8459f72247c076A' as const, // TODO: Update after deployment
   abi: [
     {
       inputs: [],
