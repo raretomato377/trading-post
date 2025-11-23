@@ -334,6 +334,25 @@ contract TradingCardGame {
     }
 
     /**
+     * @notice Transition game from CHOICE to RESOLUTION when deadline passes
+     * @param _gameId The game ID
+     * @dev Can be called by anyone when choice deadline has passed
+     *      This ensures games progress even if no one commits
+     */
+    function transitionToResolution(
+        uint256 _gameId
+    ) external validGame(_gameId) gameStatus(_gameId, GameStatus.CHOICE) {
+        Game storage game = games[_gameId];
+        require(
+            block.timestamp >= game.choiceDeadline,
+            "Choice deadline not reached"
+        );
+
+        game.status = GameStatus.RESOLUTION;
+        game.resolutionDeadline = block.timestamp + RESOLUTION_DURATION;
+    }
+
+    /**
      * @notice Update Pyth prices and resolve predictions
      * @param _gameId The game ID
      * @param _priceUpdateData Array of price update data from Hermes API

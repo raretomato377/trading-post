@@ -13,6 +13,9 @@ const config = createConfig({
     [celo.id]: http('/api/rpc'), // Use local Next.js API proxy to avoid CORS
     [celoAlfajores.id]: http(),
   },
+  // Set Celo Mainnet as the default chain
+  // This ensures users connect to the correct network
+  ssr: false,
 });
 
 const queryClient = new QueryClient();

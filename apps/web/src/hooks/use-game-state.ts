@@ -3,6 +3,7 @@ import { useAccount } from "wagmi";
 import {
   useStartGame,
   useEndGame,
+  useTransitionToResolution,
   GameStatus,
   type GameState,
   type PlayerChoice,
@@ -109,6 +110,9 @@ export function useGameStateManager(gameId: bigint | undefined) {
   }, [gameId, address]);
 
   // Poll the API endpoint
+  // Note: We use a slightly longer interval here to avoid duplicate polling with useGameState
+  // This hook is used by CardGame component, while useGameState is used by page.tsx
+  const POLLING_INTERVAL_MULTIPLIER = 2; // Poll at 2x the base interval to reduce overlap
   useEffect(() => {
     if (!gameId || !isPageVisible) {
       return;
@@ -117,12 +121,12 @@ export function useGameStateManager(gameId: bigint | undefined) {
     // Fetch immediately
     fetchGameData();
 
-    // Poll at configured interval
+    // Poll at configured interval (multiplied to reduce overlap with other polling)
     const interval = setInterval(() => {
       if (isPageVisible) {
         fetchGameData();
       }
-    }, POLLING_INTERVAL_MS);
+    }, POLLING_INTERVAL_MS * POLLING_INTERVAL_MULTIPLIER);
 
     return () => clearInterval(interval);
   }, [gameId, isPageVisible, fetchGameData]);
@@ -180,6 +184,36 @@ export function useGameStateManager(gameId: bigint | undefined) {
       hasAttemptedStartRef.current = false;
     }
   }, [address, gameState?.status, gameState?.lobbyDeadline, lobbyTimeRemaining, gameId, startGame, isStartingGame]);
+
+  // Auto-transition from CHOICE to RESOLUTION when choice deadline passes
+  const { transitionToResolution, isPending: isTransitioning } = useTransitionToResolution(gameId);
+  const hasAttemptedTransitionRef = useRef(false);
+
+  useEffect(() => {
+    // Only attempt to transition if:
+    // 1. Wallet is connected (required for transaction)
+    // 2. Game is in CHOICE state
+    // 3. Choice deadline has passed
+    // 4. We haven't already attempted to transition
+    // 5. We're not currently transitioning
+    if (
+      address &&
+      gameState?.status === GameStatus.CHOICE &&
+      gameState.choiceDeadline &&
+      choiceTimeRemaining <= 0 &&
+      !hasAttemptedTransitionRef.current &&
+      !isTransitioning
+    ) {
+      hasAttemptedTransitionRef.current = true;
+      console.log(`🎮 Auto-transitioning game ${gameId} to RESOLUTION - choice deadline passed`);
+      transitionToResolution();
+    }
+
+    // Reset the ref if game state changes (e.g., game actually transitioned)
+    if (gameState?.status !== GameStatus.CHOICE) {
+      hasAttemptedTransitionRef.current = false;
+    }
+  }, [address, gameState?.status, gameState?.choiceDeadline, choiceTimeRemaining, gameId, transitionToResolution, isTransitioning]);
 
   // Auto-end game logic: automatically call endGame when resolution deadline passes
   // Note: This will require wallet approval (popup), but happens automatically for the first user to detect it

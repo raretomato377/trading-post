@@ -1,4 +1,4 @@
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useSwitchChain } from "wagmi";
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { TRADING_CARD_GAME_CONTRACT, CELO_MAINNET_CHAIN_ID, POLLING_INTERVAL_MS } from "@/config/contracts";
 import { parseAbiItem } from "viem";
 import { useWatchContractEvent } from "wagmi";
@@ -44,8 +44,7 @@ export interface PlayerScore {
  * Hook to create a new game
  */
 export function useCreateGame() {
-  const { chainId, address } = useAccount();
-  const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
+  const { address } = useAccount();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({
     hash,
@@ -63,27 +62,12 @@ export function useCreateGame() {
       alert("Please wait while we check your current game status...");
       return;
     }
+    
     console.log('🎮 [createGame] Starting createGame...');
     console.log('🎮 [createGame] Contract address:', TRADING_CARD_GAME_CONTRACT.address);
-    console.log('🎮 [createGame] Target Chain ID:', CELO_MAINNET_CHAIN_ID);
-    console.log('🎮 [createGame] Current Chain ID:', chainId);
-    
-    // Check if we need to switch chains
-    if (chainId !== CELO_MAINNET_CHAIN_ID) {
-      console.log('🎮 [createGame] Chain mismatch detected. Switching to Celo Mainnet...');
-      try {
-        await switchChain({ chainId: CELO_MAINNET_CHAIN_ID });
-        console.log('🎮 [createGame] ✅ Chain switched successfully');
-        // Wait a moment for the chain switch to complete
-        await new Promise(resolve => setTimeout(resolve, 500));
-      } catch (switchError) {
-        console.error('🎮 [createGame] ❌ Failed to switch chain:', switchError);
-        alert(`Please switch to Celo Mainnet (Chain ID: ${CELO_MAINNET_CHAIN_ID}) to create a game.`);
-        return;
-      }
-    }
     
     try {
+      // Wagmi will automatically prompt for chain switch if needed when chainId is specified
       writeContract({
         address: TRADING_CARD_GAME_CONTRACT.address,
         abi: TRADING_CARD_GAME_CONTRACT.abi,
@@ -144,7 +128,7 @@ export function useCreateGame() {
   return {
     createGame,
     hash,
-    isPending: isPending || isConfirming || isSwitchingChain,
+    isPending: isPending || isConfirming,
     isSuccess,
     error,
     receipt,
@@ -155,8 +139,7 @@ export function useCreateGame() {
  * Hook to join an existing game
  */
 export function useJoinGame(gameId: bigint | undefined) {
-  const { chainId, address } = useAccount();
-  const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
+  const { address } = useAccount();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
@@ -174,19 +157,10 @@ export function useJoinGame(gameId: bigint | undefined) {
       alert("Please wait while we check your current game status...");
       return;
     }
-    // Check if we need to switch chains
-    if (chainId !== CELO_MAINNET_CHAIN_ID) {
-      console.log('🎮 [joinGame] Chain mismatch detected. Switching to Celo Mainnet...');
-      try {
-        await switchChain({ chainId: CELO_MAINNET_CHAIN_ID });
-        await new Promise(resolve => setTimeout(resolve, 500));
-      } catch (switchError) {
-        console.error('🎮 [joinGame] ❌ Failed to switch chain:', switchError);
-        alert(`Please switch to Celo Mainnet (Chain ID: ${CELO_MAINNET_CHAIN_ID}) to join a game.`);
-        return;
-      }
-    }
+
     if (!gameId) return;
+    
+    // Wagmi will automatically prompt for chain switch if needed when chainId is specified
     writeContract({
       address: TRADING_CARD_GAME_CONTRACT.address,
       abi: TRADING_CARD_GAME_CONTRACT.abi,
@@ -199,7 +173,7 @@ export function useJoinGame(gameId: bigint | undefined) {
   return {
     joinGame,
     hash,
-    isPending: isPending || isConfirming || isSwitchingChain,
+    isPending: isPending || isConfirming,
     isSuccess,
     error,
   };
@@ -211,8 +185,6 @@ export function useJoinGame(gameId: bigint | undefined) {
  * @param useSecureRandomness If true, uses secure randomness. Defaults to false.
  */
 export function useStartGame(gameId: bigint | undefined, useSecureRandomness: boolean = false) {
-  const { chainId } = useAccount();
-  const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
@@ -224,19 +196,7 @@ export function useStartGame(gameId: bigint | undefined, useSecureRandomness: bo
       return;
     }
 
-    // Check if we need to switch chains
-    if (chainId !== CELO_MAINNET_CHAIN_ID) {
-      console.log('🎮 [startGame] Chain mismatch detected. Switching to Celo Mainnet...');
-      try {
-        await switchChain({ chainId: CELO_MAINNET_CHAIN_ID });
-        await new Promise(resolve => setTimeout(resolve, 500));
-      } catch (switchError) {
-        console.error('🎮 [startGame] ❌ Failed to switch chain:', switchError);
-        alert(`Please switch to Celo Mainnet (Chain ID: ${CELO_MAINNET_CHAIN_ID}) to start the game.`);
-        return;
-      }
-    }
-
+    // Wagmi will automatically prompt for chain switch if needed when chainId is specified
     writeContract({
       address: TRADING_CARD_GAME_CONTRACT.address,
       abi: TRADING_CARD_GAME_CONTRACT.abi,
@@ -249,7 +209,7 @@ export function useStartGame(gameId: bigint | undefined, useSecureRandomness: bo
   return {
     startGame,
     hash,
-    isPending: isPending || isConfirming || isSwitchingChain,
+    isPending: isPending || isConfirming,
     isSuccess,
     error,
   };
@@ -343,19 +303,102 @@ export function useCommitChoices(gameId: bigint | undefined) {
     hash,
   });
 
-  const commitChoices = (cardNumbers: [bigint, bigint, bigint]) => {
+  const commitChoices = async (cardNumbers: [bigint, bigint, bigint]) => {
+    if (!gameId) {
+      console.error('🎮 [commitChoices] No game ID provided');
+      return;
+    }
+
+    console.log('🎮 [commitChoices] Starting commitChoices...');
+    console.log('🎮 [commitChoices] Game ID:', gameId.toString());
+    console.log('🎮 [commitChoices] Card numbers:', cardNumbers.map(n => n.toString()));
+
+    try {
+      // Wagmi will automatically prompt for chain switch if needed when chainId is specified
+      writeContract({
+        address: TRADING_CARD_GAME_CONTRACT.address,
+        abi: TRADING_CARD_GAME_CONTRACT.abi,
+        functionName: "commitChoices",
+        args: [gameId, cardNumbers],
+        chainId: CELO_MAINNET_CHAIN_ID,
+      });
+      console.log('🎮 [commitChoices] writeContract called successfully');
+    } catch (err) {
+      console.error('🎮 [commitChoices] Error calling writeContract:', err);
+      throw err;
+    }
+  };
+
+  // Log transaction status changes
+  useEffect(() => {
+    if (hash) {
+      console.log('🎮 [commitChoices] Transaction hash:', hash);
+      console.log('🎮 [commitChoices] View on explorer:', `https://celoscan.io/tx/${hash}`);
+    }
+  }, [hash]);
+
+  useEffect(() => {
+    if (isPending) {
+      console.log('🎮 [commitChoices] Transaction pending...');
+    }
+  }, [isPending]);
+
+  useEffect(() => {
+    if (isConfirming) {
+      console.log('🎮 [commitChoices] Waiting for confirmation...');
+    }
+  }, [isConfirming]);
+
+  useEffect(() => {
+    if (isSuccess) {
+      console.log('🎮 [commitChoices] ✅ Transaction confirmed!');
+    }
+  }, [isSuccess]);
+
+  useEffect(() => {
+    if (error) {
+      console.error('🎮 [commitChoices] ❌ Error:', error);
+      console.error('🎮 [commitChoices] Error details:', {
+        name: error?.name,
+        message: error?.message,
+      });
+    }
+  }, [error]);
+
+  return {
+    commitChoices,
+    hash,
+    isPending: isPending || isConfirming,
+    isSuccess,
+    error,
+  };
+}
+
+/**
+ * Hook to transition game from CHOICE to RESOLUTION when deadline passes
+ * @param gameId The game ID
+ */
+export function useTransitionToResolution(gameId: bigint | undefined) {
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+    hash,
+  });
+
+  const transitionToResolution = async () => {
     if (!gameId) return;
+
+    // Wagmi will automatically prompt for chain switch if needed when chainId is specified
     writeContract({
       address: TRADING_CARD_GAME_CONTRACT.address,
       abi: TRADING_CARD_GAME_CONTRACT.abi,
-      functionName: "commitChoices",
-      args: [gameId, cardNumbers],
+      functionName: "transitionToResolution",
+      args: [gameId],
       chainId: CELO_MAINNET_CHAIN_ID,
     });
   };
 
   return {
-    commitChoices,
+    transitionToResolution,
     hash,
     isPending: isPending || isConfirming,
     isSuccess,

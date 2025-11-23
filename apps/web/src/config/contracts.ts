@@ -118,6 +118,13 @@ export const TRADING_CARD_GAME_CONTRACT = {
       type: 'function',
     },
     {
+      inputs: [{ internalType: 'uint256', name: '_gameId', type: 'uint256' }],
+      name: 'transitionToResolution',
+      outputs: [],
+      stateMutability: 'nonpayable',
+      type: 'function',
+    },
+    {
       inputs: [
         { internalType: 'uint256', name: '_gameId', type: 'uint256' },
         { internalType: 'bytes[]', name: '_priceUpdateData', type: 'bytes[]' },
