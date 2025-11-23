@@ -543,6 +543,24 @@ contract TradingCardGame {
     }
 
     /**
+     * @notice Get the active game ID for a player
+     * @param _player The player address
+     * @return gameId The active game ID (0 if no active game)
+     * @dev Returns 0 if player has no active game or if their game has ended
+     */
+    function getPlayerActiveGame(address _player) external view returns (uint256) {
+        uint256 gameId = playerActiveGame[_player];
+        if (gameId > 0) {
+            Game storage game = games[gameId];
+            // Only return gameId if the game is still active (not ENDED)
+            if (game.status != GameStatus.ENDED) {
+                return gameId;
+            }
+        }
+        return 0;
+    }
+
+    /**
      * @notice Get player's committed choices
      * @param _gameId The game ID
      * @param _player The player address
