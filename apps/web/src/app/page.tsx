@@ -127,11 +127,14 @@ export default function Home() {
   const hasActiveGame = activeGameId !== undefined && activeGameId > 0n; // Player is in a game
   
   // Only show lobby if player has NO active game at all AND we're not showing results
-  const showLobby = !hasActiveGame && !isCheckingActiveGame && !showingResults && !endedGameId;
-  // Show game if player has an active game that's not ended (including LOBBY state)
-  // Also show game if gameState is still loading (we know they're in a game)
+  // Also check that we don't have a gameState (to prevent flickering during polling)
+  // If we have a gameState, we're definitely in a game, so don't show lobby
+  const showLobby = !hasActiveGame && !isCheckingActiveGame && !showingResults && !endedGameId && !gameState;
+  // Show game if:
+  // 1. Player has an active game that's not ended, OR
+  // 2. We have a gameState (even if activeGameId is temporarily undefined during polling)
   // Don't show game if we're showing results
-  const showGame = hasActiveGame && (!gameState || gameState.status !== GameStatus.ENDED) && !showingResults;
+  const showGame = (hasActiveGame || (gameState && gameState.status !== GameStatus.ENDED)) && !showingResults && gameState?.status !== GameStatus.ENDED;
   // Show results if player's game has ended OR if we have an ended game ID stored
   const showResults = (hasActiveGame && gameState?.status === GameStatus.ENDED) || 
                       (endedGameId !== undefined);
@@ -242,14 +245,14 @@ export default function Home() {
           )}
 
           {/* Game Status Display - Show when game is active */}
-          {showGame && activeGameId && (
-            <GameStatusDisplay gameId={activeGameId} />
+          {showGame && gameIdForState && (
+            <GameStatusDisplay gameId={gameIdForState} />
           )}
 
           {/* Card Game Component - Show when game is ACTIVE or CHOICE */}
-          {showGame && (
+          {showGame && gameIdForState && (
             <CardGame
-              gameId={activeGameId}
+              gameId={gameIdForState}
               maxSelections={3}
               onChoicesCommitted={() => {
                 console.log("Choices committed!");
