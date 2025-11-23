@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useGameStateManager, formatTimeRemaining, getStatusLabel } from "@/hooks/use-game-state";
 import { GameStatus } from "@/hooks/use-trading-game";
 
@@ -19,6 +20,20 @@ export function GameStatusDisplay({ gameId }: GameStatusProps) {
     manualEndGame,
     isEndingGame,
   } = useGameStateManager(gameId);
+
+  // Debug logging
+  useEffect(() => {
+    if (gameState?.status === GameStatus.RESOLUTION) {
+      console.log('🎮 [GameStatusDisplay] Resolution phase:', {
+        gameId: gameId?.toString(),
+        status: gameState.status,
+        resolutionDeadline: gameState.resolutionDeadline?.toString(),
+        resolutionTimeRemaining,
+        showEndGameButton,
+        isEndingGame,
+      });
+    }
+  }, [gameId, gameState?.status, gameState?.resolutionDeadline, resolutionTimeRemaining, showEndGameButton, isEndingGame]);
 
   // Only show loading skeleton on initial load (when we have no data yet)
   // During refreshes, keep showing existing data to prevent flickering

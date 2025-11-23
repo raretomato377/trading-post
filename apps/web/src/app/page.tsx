@@ -88,7 +88,17 @@ export default function Home() {
   const { activeGameId: currentGameId, isChecking: isCheckingActiveGame } = usePlayerActiveGame(address);
 
   // Get current game state to determine what to show
-  const { gameState } = useGameState(currentGameId);
+  const { gameState, isLoading: isLoadingGameState } = useGameState(currentGameId);
+  
+  // Debug: Log game state fetching
+  useEffect(() => {
+    console.log('🎮 [Page] Game state fetch:', {
+      currentGameId: currentGameId?.toString(),
+      isLoadingGameState,
+      gameStateStatus: gameState?.status,
+      hasGameState: !!gameState,
+    });
+  }, [currentGameId, isLoadingGameState, gameState?.status]);
 
   // Extract user data from context
   const user = context?.user;
@@ -125,8 +135,23 @@ export default function Home() {
       showGame,
       showResults,
       isCheckingActiveGame,
+      isLoadingGameState,
+      hasGameState: !!gameState,
     });
-  }, [currentGameId, activeGameId, hasActiveGame, gameState?.status, showLobby, showGame, showResults, isCheckingActiveGame]);
+    
+    if (showLobby) {
+      console.log('🎮 [Page] ⚠️ Rendering Lobby - showLobby:', showLobby, 'hasActiveGame:', hasActiveGame, 'isCheckingActiveGame:', isCheckingActiveGame);
+    }
+    
+    if (showGame && activeGameId) {
+      console.log('🎮 [Page] ✅ Rendering game components:', {
+        showGame,
+        activeGameId: activeGameId.toString(),
+        gameStateStatus: gameState?.status,
+        hasGameState: !!gameState,
+      });
+    }
+  }, [currentGameId, activeGameId, hasActiveGame, gameState?.status, showLobby, showGame, showResults, isCheckingActiveGame, isLoadingGameState]);
 
   // Don't render until mounted and ready (prevents hydration warnings)
   if (!mounted || !isMiniAppReady) {
@@ -176,7 +201,9 @@ export default function Home() {
           )}
 
           {/* Game Status Display - Show when game is active */}
-          {showGame && <GameStatusDisplay gameId={activeGameId} />}
+          {showGame && activeGameId && (
+            <GameStatusDisplay gameId={activeGameId} />
+          )}
 
           {/* Card Game Component - Show when game is ACTIVE or CHOICE */}
           {showGame && (

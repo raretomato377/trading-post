@@ -216,12 +216,33 @@ export function useGameStateManager(gameId: bigint | undefined) {
   }, [fetchGameData]);
 
   // Show end game button when resolution deadline has passed
+  // Check both the stored status and computed phase (in case status hasn't updated)
+  const computedPhase = gameState?.resolutionDeadline 
+    ? (resolutionTimeRemaining <= 0 ? GameStatus.RESOLUTION : GameStatus.RESOLUTION)
+    : undefined;
+  
   const showEndGameButton = 
     address &&
     gameState?.status === GameStatus.RESOLUTION &&
     gameState.resolutionDeadline &&
+    gameState.resolutionDeadline > 0n && // Ensure deadline is set
     resolutionTimeRemaining <= 0 &&
     !isEndingGame;
+  
+  // Debug logging for end game button
+  useEffect(() => {
+    if (gameState?.status === GameStatus.RESOLUTION) {
+      console.log('🎮 [useGameStateManager] End game button check:', {
+        address: !!address,
+        status: gameState.status,
+        resolutionDeadline: gameState.resolutionDeadline?.toString(),
+        resolutionDeadlineIsZero: gameState.resolutionDeadline === 0n,
+        resolutionTimeRemaining,
+        isEndingGame,
+        showEndGameButton,
+      });
+    }
+  }, [address, gameState?.status, gameState?.resolutionDeadline, resolutionTimeRemaining, isEndingGame, showEndGameButton]);
 
   return {
     gameId,
