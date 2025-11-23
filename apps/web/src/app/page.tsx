@@ -99,10 +99,15 @@ export default function Home() {
   // Only show lobby if player has NO active game
   // Show game if player has an active game that's not ENDED (or if gameState is still loading)
   // Show results if player's game has ended
-  const hasActiveGame = currentGameId && currentGameId > 0n; // Player is in a game
+  
+  // Ensure currentGameId is a bigint for comparison
+  const activeGameId = currentGameId && typeof currentGameId === 'bigint' ? currentGameId : 
+                       currentGameId ? BigInt(String(currentGameId)) : undefined;
+  
+  const hasActiveGame = activeGameId !== undefined && activeGameId > 0n; // Player is in a game
   
   // Only show lobby if player has NO active game at all
-  const showLobby = !hasActiveGame;
+  const showLobby = !hasActiveGame && !isCheckingActiveGame;
   // Show game if player has an active game that's not ended (including LOBBY state)
   // Also show game if gameState is still loading (we know they're in a game)
   const showGame = hasActiveGame && (!gameState || gameState.status !== GameStatus.ENDED);
@@ -113,6 +118,7 @@ export default function Home() {
   useEffect(() => {
     console.log('🎮 [Page] Game display logic:', {
       currentGameId: currentGameId?.toString(),
+      activeGameId: activeGameId?.toString(),
       hasActiveGame,
       gameStateStatus: gameState?.status,
       showLobby,
@@ -120,7 +126,7 @@ export default function Home() {
       showResults,
       isCheckingActiveGame,
     });
-  }, [currentGameId, hasActiveGame, gameState?.status, showLobby, showGame, showResults, isCheckingActiveGame]);
+  }, [currentGameId, activeGameId, hasActiveGame, gameState?.status, showLobby, showGame, showResults, isCheckingActiveGame]);
 
   // Don't render until mounted and ready (prevents hydration warnings)
   if (!mounted || !isMiniAppReady) {
@@ -170,12 +176,12 @@ export default function Home() {
           )}
 
           {/* Game Status Display - Show when game is active */}
-          {showGame && <GameStatusDisplay gameId={currentGameId} />}
+          {showGame && <GameStatusDisplay gameId={activeGameId} />}
 
           {/* Card Game Component - Show when game is ACTIVE or CHOICE */}
           {showGame && (
             <CardGame
-              gameId={currentGameId}
+              gameId={activeGameId}
               maxSelections={3}
               onChoicesCommitted={() => {
                 console.log("Choices committed!");
@@ -184,7 +190,7 @@ export default function Home() {
           )}
 
           {/* Results Display - Show when game has ended */}
-          {showResults && <ResultsDisplay gameId={currentGameId} />}
+          {showResults && <ResultsDisplay gameId={activeGameId} />}
 
           {/* Leaderboard - Always show */}
           <Leaderboard limit={10} />

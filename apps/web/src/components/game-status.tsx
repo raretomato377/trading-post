@@ -62,6 +62,7 @@ export function GameStatusDisplay({ gameId }: GameStatusProps) {
   // Get time remaining based on current phase
   let timeRemaining = 0;
   let phaseLabel = "";
+  const isResolutionEnded = status === GameStatus.RESOLUTION && resolutionTimeRemaining <= 0;
 
   switch (status) {
     case GameStatus.LOBBY:
@@ -73,8 +74,13 @@ export function GameStatusDisplay({ gameId }: GameStatusProps) {
       phaseLabel = "Time to choose";
       break;
     case GameStatus.RESOLUTION:
-      timeRemaining = resolutionTimeRemaining;
-      phaseLabel = "Resolution in";
+      if (isResolutionEnded) {
+        phaseLabel = "Waiting to end game";
+        timeRemaining = 0;
+      } else {
+        timeRemaining = resolutionTimeRemaining;
+        phaseLabel = "Resolution in";
+      }
       break;
     default:
       phaseLabel = "";
@@ -105,11 +111,15 @@ export function GameStatusDisplay({ gameId }: GameStatusProps) {
         </div>
         <div className="text-right">
           <p className="text-2xl font-bold">{statusLabel}</p>
-          {timeRemaining > 0 && (
+          {isResolutionEnded ? (
+            <p className="text-sm opacity-75 text-yellow-700 font-semibold">
+              ⏰ Ready to end
+            </p>
+          ) : timeRemaining > 0 ? (
             <p className="text-sm opacity-75">
               {phaseLabel}: {formatTimeRemaining(timeRemaining)}
             </p>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -132,13 +142,16 @@ export function GameStatusDisplay({ gameId }: GameStatusProps) {
       {/* End game button - only show when resolution deadline has passed */}
       {showEndGameButton && (
         <div className="mt-4 pt-4 border-t border-current border-opacity-20">
-          <p className="text-sm mb-2 opacity-75">Resolution phase ended. Click to finalize scores:</p>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-3">
+            <p className="text-sm font-semibold text-yellow-800 mb-1">⏰ Resolution Phase Complete</p>
+            <p className="text-xs text-yellow-700">The resolution deadline has passed. Click below to finalize scores and end the game.</p>
+          </div>
           <button
             onClick={manualEndGame}
             disabled={isEndingGame}
-            className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200 text-sm"
+            className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white font-semibold py-3 px-4 rounded-lg transition-colors duration-200 text-sm shadow-lg hover:shadow-xl"
           >
-            {isEndingGame ? "Ending Game..." : "End Game"}
+            {isEndingGame ? "Ending Game..." : "🎯 End Game & Finalize Scores"}
           </button>
         </div>
       )}
