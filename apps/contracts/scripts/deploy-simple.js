@@ -6,6 +6,11 @@ const path = require("path");
 async function main() {
   // Network configuration
   const networks = {
+    base: {
+      rpc: "https://mainnet.base.org",
+      chainId: 8453,
+      explorer: "https://basescan.org"
+    },
     celoSepolia: {
       rpc: "https://11142220.rpc.thirdweb.com",
       chainId: 11142220,
@@ -33,7 +38,7 @@ async function main() {
     process.exit(1);
   }
 
-  const validContracts = ["Lock", "RandomNumbers"];
+  const validContracts = ["Lock", "RandomNumbers", "HyperlaneSender", "HyperlaneReceiver"];
   if (!validContracts.includes(contractName)) {
     console.error(`Unknown contract: ${contractName}`);
     console.log("Available contracts:", validContracts.join(", "));
@@ -58,9 +63,15 @@ async function main() {
   console.log("Balance:", ethers.formatEther(balance), "tokens\n");
 
   // Read compiled contract
+  // Special cases: HyperlaneSender is in HyperlaneSource.sol, HyperlaneReceiver is in HyperlaneReceiver.sol
+  let sourceFile = contractName;
+  if (contractName === "HyperlaneSender") {
+    sourceFile = "HyperlaneSource";
+  }
+
   const contractArtifact = JSON.parse(
     fs.readFileSync(
-      path.join(__dirname, `../artifacts/contracts/${contractName}.sol/${contractName}.json`),
+      path.join(__dirname, `../artifacts/contracts/${sourceFile}.sol/${contractName}.json`),
       "utf8"
     )
   );
@@ -87,6 +98,12 @@ async function main() {
     contract = await factory.deploy(unlockTime, { value: lockedAmount });
   } else if (contractName === "RandomNumbers") {
     console.log("Deploying RandomNumbers contract...");
+    contract = await factory.deploy();
+  } else if (contractName === "HyperlaneSender") {
+    console.log("Deploying HyperlaneSender contract...");
+    contract = await factory.deploy();
+  } else if (contractName === "HyperlaneReceiver") {
+    console.log("Deploying HyperlaneReceiver contract...");
     contract = await factory.deploy();
   }
 

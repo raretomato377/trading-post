@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "@openzeppelin/contracts/access/Ownable.sol";
+
 // 1. Define the minimal IMailbox interface required to send messages
 interface IMailbox {
     function dispatch(
@@ -16,7 +18,7 @@ interface IMailbox {
     ) external view returns (uint256);
 }
 
-contract HyperlaneSender {
+contract HyperlaneSender is Ownable {
     // 2. The Hyperlane Mailbox address on Base Mainnet
     // Source: https://docs.hyperlane.xyz/docs/reference/addresses/deployments/mailbox
     address public constant MAILBOX_ADDRESS = 0xeA87ae93Fa0019a82A727bfd3eBd1cFCa8f64f1D;
@@ -26,14 +28,39 @@ contract HyperlaneSender {
     // Events to track sent messages
     event MessageSent(bytes32 indexed messageId, uint32 destinationDomain, address recipient);
 
-    constructor() {
+    constructor() Ownable(msg.sender) {
         mailbox = IMailbox(MAILBOX_ADDRESS);
+    }
+
+    /**
+     * @notice Get a quote for how much it will cost to send a message.
+     * @dev This is a view function - it costs no gas to call.
+     *
+     * @param _destinationDomain The Hyperlane Domain ID of the target chain (e.g., Celo is 42220).
+     * @param _recipient The address of the contract/wallet receiving the message on the target chain.
+     * @param _message The string message you want to send.
+     * @return The cost in wei (native token) required to send this message.
+     */
+    function quoteSendMessage(
+        uint32 _destinationDomain,
+        address _recipient,
+        string calldata _message
+    ) external view returns (uint256) {
+        bytes32 recipientBytes32 = addressToBytes32(_recipient);
+        bytes memory messageBytes = bytes(_message);
+
+        return mailbox.quoteDispatch(
+            _destinationDomain,
+            recipientBytes32,
+            messageBytes
+        );
     }
 
     /**
      * @notice Sends a string message to a recipient on a destination chain.
      * @dev The caller must send enough native ETH (on Base) to cover the interchain gas fee.
-     * 
+     *      Only the contract owner can call this function.
+     *
      * @param _destinationDomain The Hyperlane Domain ID of the target chain (e.g., Optimism is 10).
      * @param _recipient The address of the contract/wallet receiving the message on the target chain.
      * @param _message The string message to send.
@@ -42,7 +69,7 @@ contract HyperlaneSender {
         uint32 _destinationDomain,
         address _recipient,
         string calldata _message
-    ) external payable {
+    ) external payable onlyOwner {
         // 3. Convert the address to bytes32 (Hyperlane standard format)
         bytes32 recipientBytes32 = addressToBytes32(_recipient);
         bytes memory messageBytes = bytes(_message);
