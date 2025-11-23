@@ -18,7 +18,7 @@ const miniappMeta = {
     title: "Launch App",
     action: {
       type: "launch_frame",
-      name: "farcaster-miniapp",
+      name: "Proof of Alpha",
       url: appUrl,
       splashImageUrl: `${appUrl}/icon.png`,
       splashBackgroundColor: "#ffffff",
@@ -27,10 +27,10 @@ const miniappMeta = {
 };
 
 export const metadata: Metadata = {
-  title: 'farcaster-miniapp',
+  title: 'Proof of Alpha',
   description: 'A trading game',
   openGraph: {
-    title: 'farcaster-miniapp',
+    title: 'Proof of Alpha',
     description: 'A trading game',
     images: [`${appUrl}/opengraph-image.png`],
   },
