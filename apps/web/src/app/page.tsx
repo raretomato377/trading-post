@@ -140,29 +140,27 @@ export default function Home() {
     <main className="flex-1">
       <section className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8">
         <div className="w-full max-w-6xl mx-auto px-4 space-y-8">
-          {/* User Info Header - Only show in Farcaster */}
-          {context?.user && (
-            <div className="text-center">
-              <div className="inline-flex items-center gap-2 bg-white/30 backdrop-blur-sm px-4 py-2 rounded-full">
-                <span className="text-sm text-gray-700">{displayName}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Wallet Connection Status - Only show in Farcaster */}
-          {hasFarcasterContext && (
-            <div className="text-center">
-              <div className="inline-flex items-center gap-2 bg-white/30 backdrop-blur-sm px-4 py-2 rounded-full">
-                {isConnecting ? (
-                  <span className="text-sm text-gray-600">Connecting wallet...</span>
-                ) : isConnected && address ? (
-                  <span className="text-sm text-gray-700">
-                    Wallet: {address.slice(0, 6)}...{address.slice(-4)}
-                  </span>
-                ) : (
-                  <span className="text-sm text-yellow-600">Wallet not connected</span>
-                )}
-              </div>
+          {/* User Info and Wallet - Side by side bubbles */}
+          {(context?.user || hasFarcasterContext) && (
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              {context?.user && (
+                <div className="inline-flex items-center gap-2 bg-white/30 backdrop-blur-sm px-3 py-1.5 rounded-full">
+                  <span className="text-xs text-gray-700">{displayName}</span>
+                </div>
+              )}
+              {hasFarcasterContext && (
+                <div className="inline-flex items-center gap-2 bg-white/30 backdrop-blur-sm px-3 py-1.5 rounded-full">
+                  {isConnecting ? (
+                    <span className="text-xs text-gray-600">Connecting...</span>
+                  ) : isConnected && address ? (
+                    <span className="text-xs text-gray-700">
+                      {address.slice(0, 6)}...{address.slice(-4)}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-yellow-600">Not connected</span>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

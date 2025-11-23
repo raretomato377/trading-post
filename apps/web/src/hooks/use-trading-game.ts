@@ -511,23 +511,86 @@ export function useCommitChoices(gameId: bigint | undefined) {
  * @param gameId The game ID
  */
 export function useTransitionToResolution(gameId: bigint | undefined) {
+  const { address } = useAccount();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
+    chainId: CELO_MAINNET_CHAIN_ID,
   });
 
   const transitionToResolution = async () => {
-    if (!gameId) return;
+    if (!gameId) {
+      console.error('🎮 [transitionToResolution] No game ID provided');
+      return;
+    }
 
-    // Wagmi will automatically prompt for chain switch if needed when chainId is specified
-    writeContract({
-      address: TRADING_CARD_GAME_CONTRACT.address,
-      abi: TRADING_CARD_GAME_CONTRACT.abi,
-      functionName: "transitionToResolution",
-      args: [gameId],
-      chainId: CELO_MAINNET_CHAIN_ID,
-    });
+    if (!address) {
+      console.error('🎮 [transitionToResolution] Wallet not connected');
+      alert('Please connect your wallet first');
+      return;
+    }
+
+    console.log('🎮 [transitionToResolution] Starting transition...');
+    console.log('🎮 [transitionToResolution] Game ID:', gameId.toString());
+    console.log('🎮 [transitionToResolution] Wallet address:', address);
+    console.log('🎮 [transitionToResolution] Contract address:', TRADING_CARD_GAME_CONTRACT.address);
+
+    try {
+      // Wagmi will automatically prompt for chain switch if needed when chainId is specified
+      writeContract({
+        address: TRADING_CARD_GAME_CONTRACT.address,
+        abi: TRADING_CARD_GAME_CONTRACT.abi,
+        functionName: "transitionToResolution",
+        args: [gameId],
+        chainId: CELO_MAINNET_CHAIN_ID,
+      });
+      console.log('🎮 [transitionToResolution] writeContract called successfully');
+    } catch (err) {
+      console.error('🎮 [transitionToResolution] Error calling writeContract:', err);
+      throw err;
+    }
   };
+
+  // Log transaction status changes
+  useEffect(() => {
+    if (hash) {
+      console.log('🎮 [transitionToResolution] Transaction hash:', hash);
+      console.log('🎮 [transitionToResolution] View on explorer:', `https://celoscan.io/tx/${hash}`);
+    }
+  }, [hash]);
+
+  useEffect(() => {
+    if (isPending) {
+      console.log('🎮 [transitionToResolution] Transaction pending...');
+    }
+  }, [isPending]);
+
+  useEffect(() => {
+    if (isConfirming) {
+      console.log('🎮 [transitionToResolution] Waiting for confirmation...');
+    }
+  }, [isConfirming]);
+
+  useEffect(() => {
+    if (isSuccess) {
+      console.log('🎮 [transitionToResolution] ✅ Transaction confirmed!');
+    }
+  }, [isSuccess]);
+
+  useEffect(() => {
+    if (error) {
+      console.error('🎮 [transitionToResolution] ❌ Error:', error);
+      console.error('🎮 [transitionToResolution] Error details:', {
+        name: error?.name,
+        message: error?.message,
+        cause: (error as any)?.cause,
+        shortMessage: (error as any)?.shortMessage,
+        details: (error as any)?.details,
+        data: (error as any)?.data,
+        code: (error as any)?.code,
+      });
+    }
+  }, [error]);
 
   return {
     transitionToResolution,

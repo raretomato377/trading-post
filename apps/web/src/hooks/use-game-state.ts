@@ -350,11 +350,20 @@ export function useGameStateManager(gameId: bigint | undefined) {
 
   // Manual retry function for transitioning to resolution
   const manualTransitionToResolution = useCallback(() => {
-    if (!gameId || gameState?.status !== GameStatus.CHOICE) return;
+    if (!gameId || gameState?.status !== GameStatus.CHOICE) {
+      console.warn('🎮 [manualTransitionToResolution] Cannot transition: invalid gameId or status');
+      return;
+    }
+    if (!address) {
+      console.warn('🎮 [manualTransitionToResolution] Wallet not connected');
+      alert('Please connect your wallet first');
+      return;
+    }
+    console.log('🎮 [manualTransitionToResolution] Manual transition triggered');
     hasAttemptedTransitionRef.current = false;
     setTransitionRejected(false);
     transitionToResolution();
-  }, [gameId, gameState?.status, transitionToResolution]);
+  }, [gameId, gameState?.status, address, transitionToResolution]);
 
   // Auto-end game logic: automatically call endGame when resolution deadline passes
   // The first user to encounter the expired deadline will trigger the endGame transaction
