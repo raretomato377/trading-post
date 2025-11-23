@@ -1,4 +1,6 @@
 // Card prediction types
+// These enum values are used in card-parser.ts, card-config.ts, and prediction-card.tsx
+/* eslint-disable no-unused-vars */
 export enum PredictionType {
   PRICE_UP = "price_up",
   PRICE_DOWN = "price_down",
@@ -8,6 +10,7 @@ export enum PredictionType {
   VOLUME_ABOVE = "volume_above",
   PERCENTAGE_CHANGE = "percentage_change",
 }
+/* eslint-enable no-unused-vars */
 
 // Card interface
 export interface Card {
