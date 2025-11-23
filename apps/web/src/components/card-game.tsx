@@ -101,12 +101,17 @@ export function CardGame({ gameId, maxSelections = 3, onChoicesCommitted }: Card
 
   // Show message if game is not in a state where cards can be shown
   if (!canShowCards && gameState) {
-    if (gameState.status === GameStatus.LOBBY) {
+    // Show waiting message if in LOBBY or if cards haven't been generated yet
+    if (gameState.status === GameStatus.LOBBY || (!contractCards || contractCards.length === 0)) {
       return (
         <div className="w-full max-w-6xl mx-auto p-6">
           <div className="text-center py-12 bg-blue-50 rounded-lg border border-blue-200">
             <p className="text-lg text-blue-800">Waiting for game to start...</p>
-            <p className="text-sm text-blue-600 mt-2">The game will begin automatically when ready.</p>
+            <p className="text-sm text-blue-600 mt-2">
+              {gameState.status === GameStatus.LOBBY && (!contractCards || contractCards.length === 0)
+                ? "The lobby deadline has passed. Someone needs to click 'Start Game' to generate cards."
+                : "The game will begin when cards are generated."}
+            </p>
           </div>
         </div>
       );

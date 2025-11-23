@@ -111,8 +111,14 @@ export function GameStatusDisplay({ gameId }: GameStatusProps) {
 
   switch (status) {
     case GameStatus.LOBBY:
-      timeRemaining = lobbyTimeRemaining;
-      phaseLabel = "Lobby closes in";
+      // If lobby deadline passed but cards not generated, show waiting message
+      if (lobbyTimeRemaining <= 0 && (!cards || cards.length === 0)) {
+        phaseLabel = "Waiting to start game";
+        timeRemaining = 0;
+      } else {
+        timeRemaining = lobbyTimeRemaining;
+        phaseLabel = "Lobby closes in";
+      }
       break;
     case GameStatus.CHOICE:
       timeRemaining = choiceTimeRemaining;

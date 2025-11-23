@@ -133,12 +133,16 @@ export async function GET(request: NextRequest) {
 
     // Compute the current phase based on timestamps (not stored status)
     // This ensures we get the correct phase even if the contract status hasn't been updated
+    // IMPORTANT: If cards haven't been generated, stay in LOBBY even if deadline passed
     const currentTime = BigInt(Math.floor(Date.now() / 1000));
     let computedStatus = storedStatus;
     
     // Only compute phase if game is not explicitly ENDED
     if (computedStatus !== 4) { // 4 = ENDED
-      if (currentTime < lobbyDeadline) {
+      // If cards haven't been generated, game is still in LOBBY (waiting for startGame to be called)
+      if (cardCount === 0n) {
+        computedStatus = 0; // LOBBY - waiting for startGame
+      } else if (currentTime < lobbyDeadline) {
         computedStatus = 0; // LOBBY
       } else if (currentTime < choiceDeadline) {
         computedStatus = 2; // CHOICE
