@@ -230,8 +230,9 @@ export function useGameStateManager(gameId: bigint | undefined) {
   }, [address, gameState?.status, gameState?.lobbyDeadline, lobbyTimeRemaining, gameId, startGame, isStartingGame]);
 
   // Auto-transition from CHOICE to RESOLUTION when choice deadline passes
-  const { transitionToResolution, isPending: isTransitioning } = useTransitionToResolution(gameId);
+  const { transitionToResolution, isPending: isTransitioning, isSuccess: transitionSuccess } = useTransitionToResolution(gameId);
   const hasAttemptedTransitionRef = useRef(false);
+  const transitionSuccessRef = useRef(false);
 
   useEffect(() => {
     // Only attempt to transition if:
@@ -240,31 +241,46 @@ export function useGameStateManager(gameId: bigint | undefined) {
     // 3. Choice deadline has passed
     // 4. We haven't already attempted to transition
     // 5. We're not currently transitioning
+    // 6. Transition hasn't already succeeded
     if (
       address &&
       gameState?.status === GameStatus.CHOICE &&
       gameState.choiceDeadline &&
       choiceTimeRemaining <= 0 &&
       !hasAttemptedTransitionRef.current &&
-      !isTransitioning
+      !isTransitioning &&
+      !transitionSuccessRef.current
     ) {
       hasAttemptedTransitionRef.current = true;
       console.log(`🎮 Auto-transitioning game ${gameId} to RESOLUTION - choice deadline passed`);
       transitionToResolution();
-      // Refetch game state after a short delay to get updated resolutionDeadline
+    }
+
+    // Track successful transition
+    if (transitionSuccess && !transitionSuccessRef.current) {
+      transitionSuccessRef.current = true;
+      // Refetch game state after successful transition
       setTimeout(() => {
         fetchGameData();
-      }, 2000); // Wait 2 seconds for transaction to be mined
+      }, 2000); // Wait 2 seconds for transaction to be indexed
     }
 
-    // Reset the ref if game state changes (e.g., game actually transitioned)
-    if (gameState?.status !== GameStatus.CHOICE) {
+    // Reset the refs if game state changes (e.g., game actually transitioned or reset)
+    if (gameState?.status === GameStatus.RESOLUTION || gameState?.status === GameStatus.ENDED) {
+      // Transition succeeded, keep refs set to prevent re-triggering
+      if (gameState?.status === GameStatus.RESOLUTION) {
+        hasAttemptedTransitionRef.current = true;
+        transitionSuccessRef.current = true;
+      }
+    } else if (gameState?.status === GameStatus.CHOICE && transitionSuccessRef.current) {
+      // Game went back to CHOICE (shouldn't happen, but reset if it does)
       hasAttemptedTransitionRef.current = false;
+      transitionSuccessRef.current = false;
     }
-  }, [address, gameState?.status, gameState?.choiceDeadline, choiceTimeRemaining, gameId, transitionToResolution, isTransitioning]);
+  }, [address, gameState?.status, gameState?.choiceDeadline, choiceTimeRemaining, gameId, transitionToResolution, isTransitioning, transitionSuccess, fetchGameData]);
 
   // Auto-end game logic: automatically call endGame when resolution deadline passes
-  // Note: This will require wallet approval (popup), but happens automatically for the first user to detect it
+  // The first user to encounter the expired deadline will trigger the endGame transaction
   const { endGame, isPending: isEndingGame } = useEndGame(gameId);
   const hasAttemptedEndRef = useRef(false);
 
@@ -272,20 +288,21 @@ export function useGameStateManager(gameId: bigint | undefined) {
     // Only attempt to end game if:
     // 1. Wallet is connected (required for transaction)
     // 2. Game is in RESOLUTION state
-    // 3. Resolution deadline has passed
+    // 3. Resolution deadline has passed (resolutionTimeRemaining <= 0)
     // 4. We haven't already attempted to end it
     // 5. We're not currently ending it
     if (
       address && // Wallet must be connected
       gameState?.status === GameStatus.RESOLUTION &&
       gameState.resolutionDeadline &&
-      resolutionTimeRemaining <= 0 &&
+      resolutionTimeRemaining <= 0 && // Deadline has passed
       !hasAttemptedEndRef.current &&
       !isEndingGame
     ) {
       hasAttemptedEndRef.current = true;
       console.log(`🎮 Auto-ending game ${gameId} - resolution deadline passed`);
       // This will trigger a wallet popup for approval, but it's automatic
+      // Only the first user to see the expired deadline will trigger this
       endGame();
     }
 
