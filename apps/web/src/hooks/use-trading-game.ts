@@ -108,7 +108,6 @@ export function useCreateGame() {
       console.error('🎮 [createGame] Error details:', {
         name: error?.name,
         message: error?.message,
-        cause: error?.cause,
       });
     }
   }, [error]);
@@ -468,6 +467,29 @@ export function usePlayerChoices(gameId: bigint | undefined, playerAddress: `0x$
 
   return {
     choice,
+    isLoading,
+    error,
+  };
+}
+
+/**
+ * Hook to read next game ID
+ */
+export function useNextGameId() {
+  const isPageVisible = usePageVisibility();
+  const { data, isLoading, error } = useReadContract({
+    address: TRADING_CARD_GAME_CONTRACT.address,
+    abi: TRADING_CARD_GAME_CONTRACT.abi,
+    functionName: "getNextGameId",
+    chainId: CELO_SEPOLIA_CHAIN_ID,
+    query: {
+      enabled: isPageVisible,
+      refetchInterval: isPageVisible ? 10000 : false, // Poll every 10 seconds
+    },
+  });
+
+  return {
+    nextGameId: data as bigint | undefined,
     isLoading,
     error,
   };

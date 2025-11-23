@@ -13,6 +13,9 @@ const GAME_ABI = parseAbi([
 
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || 'https://11142220.rpc.thirdweb.com';
 
+// Force dynamic rendering since we use searchParams
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
