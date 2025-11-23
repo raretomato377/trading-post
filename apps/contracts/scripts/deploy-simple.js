@@ -38,7 +38,7 @@ async function main() {
     process.exit(1);
   }
 
-  const validContracts = ["Lock", "RandomNumbers", "HyperlaneBase", "HyperlaneCelo"];
+  const validContracts = ["Lock", "RandomNumbers", "HyperlaneBase", "HyperlaneCelo", "ExampleEntropyConsumer"];
   if (!validContracts.includes(contractName)) {
     console.error(`Unknown contract: ${contractName}`);
     console.log("Available contracts:", validContracts.join(", "));
@@ -113,6 +113,19 @@ async function main() {
     console.log("Source Domain (Base):", sourceDomain);
     console.log("Source Contract:", sourceContract);
     contract = await factory.deploy(sourceDomain, sourceContract);
+  } else if (contractName === "ExampleEntropyConsumer") {
+    // ExampleEntropyConsumer requires the HyperlaneCelo contract address
+    const hyperlaneCeloAddress = process.argv[4]; // Get from command line
+
+    if (!hyperlaneCeloAddress) {
+      console.error("\nError: ExampleEntropyConsumer requires the HyperlaneCelo contract address");
+      console.error("Usage: node scripts/deploy-simple.js celo ExampleEntropyConsumer <HyperlaneCelo_address>");
+      process.exit(1);
+    }
+
+    console.log("Deploying ExampleEntropyConsumer contract...");
+    console.log("HyperlaneCelo Contract:", hyperlaneCeloAddress);
+    contract = await factory.deploy(hyperlaneCeloAddress);
   }
 
   console.log("Waiting for deployment...");
@@ -129,6 +142,9 @@ async function main() {
     const sourceDomain = 8453;
     const sourceContract = process.argv[4];
     console.log(`npx hardhat verify --network ${networkName} ${address} ${sourceDomain} ${sourceContract}\n`);
+  } else if (contractName === "ExampleEntropyConsumer") {
+    const hyperlaneCeloAddress = process.argv[4];
+    console.log(`npx hardhat verify --network ${networkName} ${address} ${hyperlaneCeloAddress}\n`);
   } else if (contractName === "Lock") {
     const currentTimestampInSeconds = Math.round(Date.now() / 1000);
     const unlockTime = currentTimestampInSeconds + 365 * 24 * 60 * 60;

@@ -41,8 +41,8 @@ contract HyperlaneCelo is Ownable {
     uint32 public sourceDomain;
     address public sourceContract;
 
-    // Access control: only this contract can request entropy
-    address public allowedRequester;
+    // Access control: mapping of allowed requesters
+    mapping(address => bool) public allowedRequesters;
 
     // Struct for the entropy data received cross-chain
     struct EntropyData {
@@ -71,13 +71,18 @@ contract HyperlaneCelo is Ownable {
     event EntropyRequested(address indexed requester, bytes32 messageId);
     event EntropyCallbackSent(address indexed requester, bytes32 randomNumber, uint64 sequenceNumber);
     event EntropyCallbackFailed(address indexed requester, bytes reason);
-    event AllowedRequesterUpdated(address indexed oldRequester, address indexed newRequester);
+    event AllowedRequesterAdded(address indexed requester);
+    event AllowedRequesterRemoved(address indexed requester);
     event SourceConfigUpdated(uint32 sourceDomain, address sourceContract);
 
     constructor(uint32 _sourceDomain, address _sourceContract) Ownable(msg.sender) {
         mailbox = IMailbox(MAILBOX_ADDRESS);
         sourceDomain = _sourceDomain;
         sourceContract = _sourceContract;
+
+        // Add default allowed requesters
+        allowedRequesters[0x1BcD474505955da4Fa953ec0f61904B6B46de5eE] = true;
+        allowedRequesters[0x99d657e8B0d905A03E04553db7fcb6CcCCa54657] = true;
     }
 
     // 3. Modifier to ensure only the Mailbox can call the handle function
@@ -199,21 +204,41 @@ contract HyperlaneCelo is Ownable {
     }
 
     /**
-     * @notice Modifier to restrict function access to only the allowed requester contract
+     * @notice Modifier to restrict function access to only allowed requesters
      */
     modifier onlyAllowedRequester() {
-        require(msg.sender == allowedRequester, "Only allowed requester can call");
+        require(allowedRequesters[msg.sender], "Only allowed requester can call");
         _;
     }
 
     /**
-     * @notice Set the allowed requester contract address (only owner)
-     * @param _allowedRequester The address of the contract allowed to request entropy
+     * @notice Add an allowed requester address (only owner)
+     * @param _requester The address to allow for requesting entropy
      */
-    function setAllowedRequester(address _allowedRequester) external onlyOwner {
-        address oldRequester = allowedRequester;
-        allowedRequester = _allowedRequester;
-        emit AllowedRequesterUpdated(oldRequester, _allowedRequester);
+    function addAllowedRequester(address _requester) external onlyOwner {
+        require(_requester != address(0), "Invalid address");
+        require(!allowedRequesters[_requester], "Already allowed");
+        allowedRequesters[_requester] = true;
+        emit AllowedRequesterAdded(_requester);
+    }
+
+    /**
+     * @notice Remove an allowed requester address (only owner)
+     * @param _requester The address to remove from allowed requesters
+     */
+    function removeAllowedRequester(address _requester) external onlyOwner {
+        require(allowedRequesters[_requester], "Not an allowed requester");
+        allowedRequesters[_requester] = false;
+        emit AllowedRequesterRemoved(_requester);
+    }
+
+    /**
+     * @notice Check if an address is an allowed requester
+     * @param _requester The address to check
+     * @return bool True if the address is allowed
+     */
+    function isAllowedRequester(address _requester) external view returns (bool) {
+        return allowedRequesters[_requester];
     }
 
     /**
