@@ -44,7 +44,7 @@ export interface PlayerScore {
  * Hook to create a new game
  */
 export function useCreateGame() {
-  const { address } = useAccount();
+  const { address, chainId } = useAccount();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({
     hash,
@@ -65,18 +65,59 @@ export function useCreateGame() {
     
     console.log('🎮 [createGame] Starting createGame...');
     console.log('🎮 [createGame] Contract address:', TRADING_CARD_GAME_CONTRACT.address);
+    console.log('🎮 [createGame] Expected Chain ID:', CELO_MAINNET_CHAIN_ID);
+    console.log('🎮 [createGame] Current Chain ID:', chainId);
+    console.log('🎮 [createGame] Wallet address:', address);
+    
+    // Check if wallet is on the correct chain
+    if (chainId !== CELO_MAINNET_CHAIN_ID) {
+      const errorMsg = `Wallet is on wrong network. Current: ${chainId}, Expected: ${CELO_MAINNET_CHAIN_ID}. Please switch to Celo Mainnet.`;
+      console.error('🎮 [createGame]', errorMsg);
+      throw new Error(errorMsg);
+    }
     
     try {
       // Wagmi will automatically prompt for chain switch if needed when chainId is specified
+      // Try to estimate gas first to get better error messages
       writeContract({
         address: TRADING_CARD_GAME_CONTRACT.address,
         abi: TRADING_CARD_GAME_CONTRACT.abi,
         functionName: "createGame",
         chainId: CELO_MAINNET_CHAIN_ID,
+        // Don't specify gas - let Wagmi estimate it
+        // If estimation fails, we'll get a better error message
       });
       console.log('🎮 [createGame] writeContract called successfully');
-    } catch (err) {
+    } catch (err: any) {
       console.error('🎮 [createGame] Error calling writeContract:', err);
+      
+      // Provide more helpful error messages
+      const errorMessage = err?.message || err?.shortMessage || String(err);
+      console.error('🎮 [createGame] Error details:', {
+        message: errorMessage,
+        name: err?.name,
+        cause: err?.cause,
+        shortMessage: err?.shortMessage,
+        details: err?.details,
+        data: err?.data,
+        code: err?.code,
+      });
+      
+      // Check for specific error types
+      if (errorMessage?.toLowerCase().includes('insufficient') || 
+          errorMessage?.toLowerCase().includes('balance') ||
+          errorMessage?.toLowerCase().includes('funds')) {
+        console.error('🎮 [createGame] Insufficient balance error detected');
+        console.error('🎮 [createGame] Current chain:', chainId);
+        console.error('🎮 [createGame] Expected chain:', CELO_MAINNET_CHAIN_ID);
+        console.error('🎮 [createGame] This might be due to:');
+        console.error('  1. Wallet is on wrong network (not Celo Mainnet)');
+        console.error('  2. Gas estimation failed (contract might be reverting)');
+        console.error('  3. Actual insufficient CELO balance for gas');
+        console.error('  4. RPC endpoint issues');
+        console.error('  5. Contract not deployed at this address');
+      }
+      
       throw err;
     }
   };

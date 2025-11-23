@@ -21,12 +21,13 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
   const { hasActiveGame, activeGameId, isChecking: isCheckingActiveGame } = usePlayerActiveGame(address);
   const { availableLobbies, isLoading: isLoadingLobbies, hasAvailableLobbies } = useAvailableLobbies(address);
   
-  // Check wallet balance on Celo Mainnet (only if on correct chain)
+  // Check wallet balance on Celo Mainnet (always check, regardless of current chain)
+  // This ensures we show the correct balance even if user is on wrong chain
   const { data: balance, isLoading: isLoadingBalance } = useBalance({
     address,
-    chainId: isConnected && chainId === CELO_MAINNET_CHAIN_ID ? CELO_MAINNET_CHAIN_ID : undefined,
+    chainId: CELO_MAINNET_CHAIN_ID, // Always check Celo Mainnet balance
     query: {
-      enabled: isConnected && chainId === CELO_MAINNET_CHAIN_ID,
+      enabled: isConnected && !!address,
     },
   });
   
@@ -114,10 +115,25 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
     console.log('🎮 [Lobby] handleCreateGame called');
     console.log('🎮 [Lobby] isConnected:', isConnected);
     console.log('🎮 [Lobby] address:', address);
+    console.log('🎮 [Lobby] chainId:', chainId);
+    console.log('🎮 [Lobby] expected chainId:', CELO_MAINNET_CHAIN_ID);
+    console.log('🎮 [Lobby] balance:', balance ? `${formatUnits(balance.value, balance.decimals)} ${balance.symbol}` : 'loading...');
     
     if (!isConnected) {
       console.warn('🎮 [Lobby] Wallet not connected');
       alert("Please connect your wallet first");
+      return;
+    }
+    
+    if (isWrongChain) {
+      console.warn('🎮 [Lobby] Wrong chain detected');
+      alert(`Please switch to Celo Mainnet (Chain ID: ${CELO_MAINNET_CHAIN_ID}) to create a game. Current: Chain ID ${chainId}`);
+      return;
+    }
+    
+    if (hasLowBalance) {
+      console.warn('🎮 [Lobby] Low balance detected');
+      alert("Insufficient CELO balance for gas fees. Please fund your wallet.");
       return;
     }
     
