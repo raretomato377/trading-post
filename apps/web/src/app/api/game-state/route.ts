@@ -121,31 +121,46 @@ export async function GET(request: NextRequest) {
     // gameStateWithPlayer is either:
     // - [status, startTime, lobbyDeadline, choiceDeadline, resolutionDeadline, playerCount, cardCount, playerHasCommitted, playerSelectedCards] from getGameStateWithPlayer
     // - [status, startTime, lobbyDeadline, choiceDeadline, resolutionDeadline, playerCount, cardCount, false, [0n, 0n, 0n]] from getGameState fallback
-    const gameState = [
-      gameStateWithPlayer[0],
-      gameStateWithPlayer[1],
-      gameStateWithPlayer[2],
-      gameStateWithPlayer[3],
-      gameStateWithPlayer[4],
-      gameStateWithPlayer[5],
-      gameStateWithPlayer[6],
-    ] as [bigint, bigint, bigint, bigint, bigint, bigint, bigint];
+    const storedStatus = Number(gameStateWithPlayer[0]);
+    const startTime = BigInt(gameStateWithPlayer[1] as bigint);
+    const lobbyDeadline = BigInt(gameStateWithPlayer[2] as bigint);
+    const choiceDeadline = BigInt(gameStateWithPlayer[3] as bigint);
+    const resolutionDeadline = BigInt(gameStateWithPlayer[4] as bigint);
+    const playerCount = BigInt(gameStateWithPlayer[5] as bigint);
+    const cardCount = BigInt(gameStateWithPlayer[6] as bigint);
     const playerHasCommitted = (gameStateWithPlayer[7] ?? false) as boolean;
     const playerSelectedCards = (gameStateWithPlayer[8] ?? [0n, 0n, 0n]) as [bigint, bigint, bigint];
 
+    // Compute the current phase based on timestamps (not stored status)
+    // This ensures we get the correct phase even if the contract status hasn't been updated
+    const currentTime = BigInt(Math.floor(Date.now() / 1000));
+    let computedStatus = storedStatus;
+    
+    // Only compute phase if game is not explicitly ENDED
+    if (computedStatus !== 4) { // 4 = ENDED
+      if (currentTime < lobbyDeadline) {
+        computedStatus = 0; // LOBBY
+      } else if (currentTime < choiceDeadline) {
+        computedStatus = 2; // CHOICE
+      } else if (currentTime < resolutionDeadline) {
+        computedStatus = 3; // RESOLUTION
+      } else {
+        // Resolution deadline passed, but game not ended yet
+        computedStatus = 3; // Still RESOLUTION until endGame is called
+      }
+    }
+
     // Format the response
     const response = {
-      gameState: gameState
-        ? {
-            status: Number(gameState[0]),
-            startTime: gameState[1].toString(),
-            lobbyDeadline: gameState[2].toString(),
-            choiceDeadline: gameState[3].toString(),
-            resolutionDeadline: gameState[4].toString(),
-            playerCount: gameState[5].toString(),
-            cardCount: gameState[6].toString(),
-          }
-        : null,
+      gameState: {
+        status: computedStatus, // Use computed status based on timestamps
+        startTime: startTime.toString(),
+        lobbyDeadline: lobbyDeadline.toString(),
+        choiceDeadline: choiceDeadline.toString(),
+        resolutionDeadline: resolutionDeadline.toString(),
+        playerCount: playerCount.toString(),
+        cardCount: cardCount.toString(),
+      },
       players: players || [],
       cards: cards?.map((c) => c.toString()) || [],
       playerChoice: usePlayerSpecificState
