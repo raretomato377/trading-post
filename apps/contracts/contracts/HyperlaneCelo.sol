@@ -2,6 +2,16 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
+// Interface that contracts must implement to receive entropy callbacks
+interface IEntropyCallback {
+    /**
+     * @notice Called when entropy is received
+     * @param randomNumber The 32-byte random number from Pyth
+     * @param sequenceNumber The Pyth sequence number for this entropy
+     */
+    function receiveEntropy(bytes32 randomNumber, uint64 sequenceNumber) external;
+}
+
 interface IMailbox {
     function dispatch(
         uint32 _destinationDomain,
@@ -40,6 +50,7 @@ contract HyperlaneCelo is Ownable {
         uint256 entropyLength;
         uint64 sequenceNumber;
         address sourceContract;
+        address requester; // The original requester who should receive the callback
     }
 
     // 2. State variable to store the last received entropy data
@@ -53,10 +64,13 @@ contract HyperlaneCelo is Ownable {
         bytes32 randomNumber,
         uint256 entropyLength,
         uint64 sequenceNumber,
-        address sourceContract
+        address sourceContract,
+        address requester
     );
 
     event EntropyRequested(address indexed requester, bytes32 messageId);
+    event EntropyCallbackSent(address indexed requester, bytes32 randomNumber, uint64 sequenceNumber);
+    event EntropyCallbackFailed(address indexed requester, bytes reason);
     event AllowedRequesterUpdated(address indexed oldRequester, address indexed newRequester);
     event SourceConfigUpdated(uint32 sourceDomain, address sourceContract);
 
@@ -105,8 +119,27 @@ contract HyperlaneCelo is Ownable {
             entropyData.randomNumber,
             entropyData.entropyLength,
             entropyData.sequenceNumber,
-            entropyData.sourceContract
+            entropyData.sourceContract,
+            entropyData.requester
         );
+
+        // 6. Callback to the original requester if it's a contract
+        // Check if the requester address has code (is a contract)
+        if (_isContract(entropyData.requester)) {
+            try IEntropyCallback(entropyData.requester).receiveEntropy(
+                entropyData.randomNumber,
+                entropyData.sequenceNumber
+            ) {
+                emit EntropyCallbackSent(
+                    entropyData.requester,
+                    entropyData.randomNumber,
+                    entropyData.sequenceNumber
+                );
+            } catch (bytes memory reason) {
+                // Callback failed, but don't revert - just emit event
+                emit EntropyCallbackFailed(entropyData.requester, reason);
+            }
+        }
     }
 
     /**
@@ -207,5 +240,16 @@ contract HyperlaneCelo is Ownable {
      */
     function addressToBytes32(address _addr) internal pure returns (bytes32) {
         return bytes32(uint256(uint160(_addr)));
+    }
+
+    /**
+     * @dev Check if an address is a contract
+     */
+    function _isContract(address _addr) internal view returns (bool) {
+        uint256 size;
+        assembly {
+            size := extcodesize(_addr)
+        }
+        return size > 0;
     }
 }

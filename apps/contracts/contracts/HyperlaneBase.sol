@@ -38,6 +38,7 @@ contract HyperlaneBase is Ownable, IEntropyConsumer {
         address recipient;
         uint256 length;
         uint256 hyperlaneValue; // ETH sent for Hyperlane gas
+        address requester; // The original requester from the origin chain
     }
 
     // Struct for the entropy data sent cross-chain
@@ -46,6 +47,7 @@ contract HyperlaneBase is Ownable, IEntropyConsumer {
         uint256 entropyLength;
         uint64 sequenceNumber;
         address sourceContract;
+        address requester; // The original requester who should receive the callback
     }
 
     // Mapping from sequence number to entropy request details
@@ -56,9 +58,9 @@ contract HyperlaneBase is Ownable, IEntropyConsumer {
 
     // Events to track sent messages
     event MessageSent(bytes32 indexed messageId, uint32 destinationDomain, address recipient);
-    event EntropyRequested(uint64 indexed sequenceNumber, uint32 destinationDomain, address recipient, uint256 length);
-    event EntropySent(uint64 indexed sequenceNumber, bytes32 messageId, bytes32 randomNumber);
-    event EntropyRequestReceived(uint32 indexed origin, address indexed requester);
+    event EntropyRequested(uint64 indexed sequenceNumber, uint32 destinationDomain, address recipient, address requester, uint256 length);
+    event EntropySent(uint64 indexed sequenceNumber, bytes32 messageId, uint32 destinationDomain, address recipient, bytes32 randomNumber);
+    event EntropyRequestReceived(uint32 indexed origin, bytes32 indexed senderContract, address requester);
     event Funded(address indexed funder, uint256 amount);
     event Withdrawn(address indexed recipient, uint256 amount);
 
@@ -94,7 +96,8 @@ contract HyperlaneBase is Ownable, IEntropyConsumer {
             randomNumber: randomNumber,
             entropyLength: 32, // bytes32 = 32 bytes
             sequenceNumber: sequence,
-            sourceContract: address(this)
+            sourceContract: address(this),
+            requester: request.requester
         });
 
         // Convert address to bytes32 for Hyperlane
@@ -107,7 +110,7 @@ contract HyperlaneBase is Ownable, IEntropyConsumer {
             abi.encode(entropyData)
         );
 
-        emit EntropySent(sequence, messageId, randomNumber);
+        emit EntropySent(sequence, messageId, request.destinationDomain, request.recipient, randomNumber);
 
         // Clean up the pending request
         delete pendingRequests[sequence];
@@ -129,21 +132,27 @@ contract HyperlaneBase is Ownable, IEntropyConsumer {
         // Decode the requester address from the message
         address requester = abi.decode(_messageBody, (address));
 
-        emit EntropyRequestReceived(_origin, requester);
+        // Log both the sender contract (HyperlaneCelo) and the actual requester
+        emit EntropyRequestReceived(_origin, _sender, requester);
 
-        // Trigger entropy request - use the stored value from the mailbox call
-        _requestAndRelayEntropyInternal(_origin, requester, msg.value);
+        // Convert sender bytes32 to address - this is the HyperlaneCelo contract
+        address senderContract = bytes32ToAddress(_sender);
+
+        // Trigger entropy request - send entropy back to the sender contract, not the wallet
+        _requestAndRelayEntropyInternal(_origin, senderContract, requester, msg.value);
     }
 
     /**
      * @notice Internal function to request entropy and relay it to a recipient.
      * @param _destinationDomain The Hyperlane Domain ID of the target chain.
      * @param _recipient The address of the contract/wallet receiving the random number.
+     * @param _requester The original address that requested the entropy.
      * @param _payment The ETH payment provided for fees.
      */
     function _requestAndRelayEntropyInternal(
         uint32 _destinationDomain,
         address _recipient,
+        address _requester,
         uint256 _payment
     ) internal {
         // Calculate required fees
@@ -155,7 +164,8 @@ contract HyperlaneBase is Ownable, IEntropyConsumer {
             randomNumber: bytes32(0),
             entropyLength: 32,
             sequenceNumber: 0,
-            sourceContract: address(this)
+            sourceContract: address(this),
+            requester: _requester
         });
         bytes memory dummyMessage = abi.encode(dummyData);
         uint256 hyperlaneQuote = mailbox.quoteDispatch(
@@ -178,10 +188,11 @@ contract HyperlaneBase is Ownable, IEntropyConsumer {
             destinationDomain: _destinationDomain,
             recipient: _recipient,
             length: 32,
-            hyperlaneValue: hyperlaneQuote
+            hyperlaneValue: hyperlaneQuote,
+            requester: _requester
         });
 
-        emit EntropyRequested(sequenceNumber, _destinationDomain, _recipient, 32);
+        emit EntropyRequested(sequenceNumber, _destinationDomain, _recipient, _requester, 32);
 
         // No refund - keep any excess in the contract for future requests
     }
@@ -223,7 +234,7 @@ contract HyperlaneBase is Ownable, IEntropyConsumer {
         uint32 _destinationDomain,
         address _recipient
     ) external payable onlyOwner {
-        _requestAndRelayEntropyInternal(_destinationDomain, _recipient, msg.value);
+        _requestAndRelayEntropyInternal(_destinationDomain, _recipient, msg.sender, msg.value);
     }
 
     /**
@@ -328,5 +339,13 @@ contract HyperlaneBase is Ownable, IEntropyConsumer {
      */
     function addressToBytes32(address _addr) internal pure returns (bytes32) {
         return bytes32(uint256(uint160(_addr)));
+    }
+
+    /**
+     * @dev Helper to convert bytes32 back to an address.
+     * Useful for debugging Hyperlane sender addresses.
+     */
+    function bytes32ToAddress(bytes32 _bytes32) public pure returns (address) {
+        return address(uint160(uint256(_bytes32)));
     }
 }
