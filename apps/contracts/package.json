@@ -48,6 +48,7 @@
     "viem": "^2.0.0"
   },
   "dependencies": {
+    "@hyperlane-xyz/core": "^10.0.3",
     "@openzeppelin/contracts": "^5.0.0",
     "dotenv": "^17.2.3"
   }
