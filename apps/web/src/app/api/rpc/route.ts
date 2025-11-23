@@ -1,6 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || 'https://11142220.rpc.thirdweb.com';
+// Primary RPC endpoint
+const PRIMARY_RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || 'https://11142220.rpc.thirdweb.com';
+// Fallback RPC endpoints (add more if needed)
+const FALLBACK_RPC_URLS = [
+  'https://11142220.rpc.thirdweb.com',
+  // Add other RPC endpoints here if available
+];
+
+// Retry with exponential backoff for rate limits
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries = 3
+): Promise<Response> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const response = await fetch(url, options);
+
+    // If rate limited (429), retry with exponential backoff
+    if (response.status === 429 && attempt < maxRetries - 1) {
+      const retryAfter = response.headers.get('Retry-After');
+      const waitTime = retryAfter 
+        ? parseInt(retryAfter) * 1000 
+        : Math.pow(2, attempt) * 1000; // Exponential backoff: 1s, 2s, 4s
+      
+      console.warn(`Rate limited (429), retrying in ${waitTime}ms (attempt ${attempt + 1}/${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+      continue;
+    }
+
+    return response;
+  }
+
+  // If all retries failed, return the last response
+  return await fetch(url, options);
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,13 +45,40 @@ export async function POST(request: NextRequest) {
       params: body.params ? `${body.params.length} params` : 'no params',
     });
 
-    const response = await fetch(RPC_URL, {
+    // Try primary RPC endpoint with retry logic
+    let response = await fetchWithRetry(PRIMARY_RPC_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
     });
+
+    // If still rate limited after retries, try fallback endpoints
+    if (response.status === 429) {
+      console.warn('Primary RPC rate limited, trying fallback endpoints...');
+      for (const fallbackUrl of FALLBACK_RPC_URLS) {
+        if (fallbackUrl === PRIMARY_RPC_URL) continue; // Skip if same as primary
+        
+        try {
+          response = await fetch(fallbackUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(body),
+          });
+          
+          if (response.ok) {
+            console.log('Fallback RPC succeeded:', fallbackUrl);
+            break;
+          }
+        } catch (err) {
+          console.warn('Fallback RPC failed:', fallbackUrl, err);
+          continue;
+        }
+      }
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -26,6 +87,20 @@ export async function POST(request: NextRequest) {
         statusText: response.statusText,
         body: errorText,
       });
+      
+      // Provide user-friendly error message for rate limits
+      if (response.status === 429) {
+        return NextResponse.json(
+          { 
+            error: 'Rate limit exceeded',
+            message: 'Too many requests. Please try again in a few moments.',
+            details: errorText,
+            status: 429 
+          },
+          { status: 429 }
+        );
+      }
+      
       return NextResponse.json(
         { 
           error: 'RPC request failed',
