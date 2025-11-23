@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAccount, useSwitchChain } from "wagmi";
+import { useAccount, useSwitchChain, useBalance } from "wagmi";
 import { useCreateGame, useJoinGame, useGameState, GameStatus, useNextGameId, usePlayerActiveGame, useAvailableLobbies } from "@/hooks/use-trading-game";
 import { CELO_MAINNET_CHAIN_ID } from "@/config/contracts";
 import { formatTimeRemaining } from "@/hooks/use-game-state";
+import { formatUnits } from "viem";
 
 interface LobbyProps {
   currentGameId?: bigint;
@@ -20,11 +21,21 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
   const { hasActiveGame, activeGameId, isChecking: isCheckingActiveGame } = usePlayerActiveGame(address);
   const { availableLobbies, isLoading: isLoadingLobbies, hasAvailableLobbies } = useAvailableLobbies(address);
   
+  // Check wallet balance
+  const { data: balance, isLoading: isLoadingBalance } = useBalance({
+    address,
+    chainId: CELO_MAINNET_CHAIN_ID,
+  });
+  
   // Use the first available lobby if no currentGameId is set
   const lobbyToJoin = currentGameId || (availableLobbies.length > 0 ? availableLobbies[0].gameId : undefined);
   const { joinGame, isPending: isJoining } = useJoinGame(lobbyToJoin);
   
   const isWrongChain = isConnected && chainId !== CELO_MAINNET_CHAIN_ID;
+  
+  // Check if balance is too low (less than 0.001 CELO)
+  const minBalance = BigInt("1000000000000000"); // 0.001 CELO in wei
+  const hasLowBalance = balance && balance.value < minBalance;
 
   const handleSwitchChain = async () => {
     try {
@@ -221,7 +232,39 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
                   <p className="text-green-600">✅ Game created! ID: {createdGameId?.toString() || 'loading...'}</p>
                 )}
                 {createError && (
-                  <p className="text-red-600">❌ Error: {createError.message}</p>
+                  <div className="space-y-2">
+                    <p className="text-red-600 font-semibold">❌ Error: {createError.message}</p>
+                    {(createError.message?.toLowerCase().includes('insufficient') || 
+                      createError.message?.toLowerCase().includes('balance') ||
+                      createError.message?.toLowerCase().includes('funds')) && (
+                      <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded text-xs">
+                        <p className="text-yellow-800 font-semibold mb-1">💡 Need CELO for Gas</p>
+                        <p className="text-yellow-700 mb-2">
+                          You need CELO in your wallet to pay for transaction fees. Get CELO from:
+                        </p>
+                        <ul className="list-disc list-inside space-y-1 text-yellow-700">
+                          <li>
+                            <a href="https://celo.org/developers/faucet" target="_blank" rel="noopener noreferrer" className="underline">
+                              Celo Faucet (for testnet)
+                            </a>
+                          </li>
+                          <li>
+                            <a href="https://valoraapp.com/" target="_blank" rel="noopener noreferrer" className="underline">
+                              Valora Wallet
+                            </a>
+                          </li>
+                          <li>
+                            <a href="https://www.coinbase.com/price/celo" target="_blank" rel="noopener noreferrer" className="underline">
+                              Buy CELO on Coinbase
+                            </a>
+                          </li>
+                        </ul>
+                        <p className="text-yellow-600 mt-2 text-xs">
+                          You only need a small amount (~0.001 CELO) for gas fees.
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             )}
@@ -245,6 +288,36 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
           <p className="text-sm text-orange-700">
             You are already participating in Game ID: <strong>{activeGameId.toString()}</strong>. 
             Please finish that game before creating or joining a new one.
+          </p>
+        </div>
+      )}
+
+      {hasLowBalance && isConnected && !isLoadingBalance && (
+        <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <p className="text-sm text-yellow-800 font-semibold mb-2">
+            ⚠️ Low Balance
+          </p>
+          <p className="text-sm text-yellow-700 mb-2">
+            Your wallet balance is low. You need CELO to pay for transaction fees.
+            {balance && (
+              <span className="block mt-1">
+                Current balance: {formatUnits(balance.value, balance.decimals)} {balance.symbol}
+              </span>
+            )}
+          </p>
+          <p className="text-xs text-yellow-600 mb-3">
+            Get CELO from:{" "}
+            <a href="https://valoraapp.com/" target="_blank" rel="noopener noreferrer" className="underline">
+              Valora
+            </a>
+            {" | "}
+            <a href="https://www.coinbase.com/price/celo" target="_blank" rel="noopener noreferrer" className="underline">
+              Coinbase
+            </a>
+            {" | "}
+            <a href="https://celo.org/developers/faucet" target="_blank" rel="noopener noreferrer" className="underline">
+              Faucet (testnet)
+            </a>
           </p>
         </div>
       )}

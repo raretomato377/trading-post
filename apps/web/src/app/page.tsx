@@ -12,7 +12,6 @@ import { useGameState, GameStatus, usePlayerActiveGame } from "@/hooks/use-tradi
 export default function Home() {
   const { context, isMiniAppReady } = useMiniApp();
   const [mounted, setMounted] = useState(false);
-  const [currentGameId, setCurrentGameId] = useState<bigint | undefined>(undefined);
 
   // Wait for component to mount (client-side only) to avoid hydration warnings
   useEffect(() => {
@@ -85,32 +84,11 @@ export default function Home() {
     context,
   ]);
 
-  // Get player's active game from contract
-  const { activeGameId: playerActiveGameId, isChecking: isCheckingActiveGame } = usePlayerActiveGame(address);
+  // Get player's active game from contract - THIS IS THE SOURCE OF TRUTH
+  const { activeGameId: currentGameId, isChecking: isCheckingActiveGame } = usePlayerActiveGame(address);
 
   // Get current game state to determine what to show
   const { gameState } = useGameState(currentGameId);
-
-  // Automatically set currentGameId if player has an active game
-  // This ensures players always see their active game when they log in
-  useEffect(() => {
-    if (playerActiveGameId && playerActiveGameId !== currentGameId) {
-      console.log('🎮 [Home] Player has active game, setting currentGameId:', playerActiveGameId.toString());
-      setCurrentGameId(playerActiveGameId);
-    } else if (!playerActiveGameId && currentGameId && !isCheckingActiveGame) {
-      // If player no longer has an active game and the current game has ended, clear currentGameId
-      // This allows them to see the lobby again
-      if (gameState?.status === GameStatus.ENDED) {
-        console.log('🎮 [Home] Player no longer has active game, clearing currentGameId');
-        setCurrentGameId(undefined);
-      }
-    }
-  }, [playerActiveGameId, currentGameId, isCheckingActiveGame, gameState?.status]);
-
-  // Handle game joined
-  const handleGameJoined = (gameId: bigint) => {
-    setCurrentGameId(gameId);
-  };
 
   // Extract user data from context
   const user = context?.user;
@@ -171,11 +149,7 @@ export default function Home() {
 
           {/* Lobby Component - Show when no game or game in LOBBY */}
           {showLobby && (
-            <Lobby
-              currentGameId={currentGameId}
-              onGameJoined={handleGameJoined}
-              onGameStarted={handleGameJoined}
-            />
+            <Lobby />
           )}
 
           {/* Game Status Display - Show when game is active */}
