@@ -419,8 +419,10 @@ export function useGenerateCards(
  */
 export function useCommitChoices(gameId: bigint | undefined) {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+  const { isLoading: isConfirming, isSuccess, error: receiptError } = useWaitForTransactionReceipt({
     hash,
+    chainId: CELO_MAINNET_CHAIN_ID,
+    timeout: 120_000, // 2 minute timeout
   });
 
   const commitChoices = async (cardNumbers: [bigint, bigint, bigint]) => {
@@ -479,18 +481,28 @@ export function useCommitChoices(gameId: bigint | undefined) {
     if (error) {
       console.error('🎮 [commitChoices] ❌ Error:', error);
       console.error('🎮 [commitChoices] Error details:', {
-        name: error?.name,
-        message: error?.message,
+        name: (error as any)?.name,
+        message: (error as any)?.message,
       });
     }
   }, [error]);
+
+  useEffect(() => {
+    if (receiptError) {
+      console.error('🎮 [commitChoices] ❌ Receipt error:', receiptError);
+      console.error('🎮 [commitChoices] Receipt error details:', {
+        name: (receiptError as any)?.name,
+        message: (receiptError as any)?.message,
+      });
+    }
+  }, [receiptError]);
 
   return {
     commitChoices,
     hash,
     isPending: isPending || isConfirming,
     isSuccess,
-    error,
+    error: error || receiptError,
   };
 }
 

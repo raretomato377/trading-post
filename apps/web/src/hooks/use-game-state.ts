@@ -135,7 +135,21 @@ export function useGameStateManager(gameId: bigint | undefined) {
   const getTimeRemaining = useCallback((deadline: bigint): number => {
     const now = Math.floor(Date.now() / 1000);
     const deadlineNum = Number(deadline);
-    return Math.max(0, deadlineNum - now);
+    const remaining = deadlineNum - now;
+    
+    // Log for debugging resolution timer
+    if (deadline > 0n && remaining < 600) { // Log if less than 10 minutes remaining
+      console.log('🎮 [getTimeRemaining] Timer calculation:', {
+        deadline: deadline.toString(),
+        deadlineNum,
+        now,
+        remaining,
+        remainingMinutes: Math.floor(remaining / 60),
+        remainingSeconds: remaining % 60,
+      });
+    }
+    
+    return Math.max(0, remaining);
   }, []);
 
   const lobbyTimeRemaining = gameState?.lobbyDeadline
@@ -147,6 +161,25 @@ export function useGameStateManager(gameId: bigint | undefined) {
   const resolutionTimeRemaining = gameState?.resolutionDeadline
     ? getTimeRemaining(gameState.resolutionDeadline)
     : 0;
+
+  // Log resolution timer for debugging
+  useEffect(() => {
+    if (gameState?.status === GameStatus.RESOLUTION) {
+      const currentTime = Math.floor(Date.now() / 1000);
+      const deadlineNum = gameState.resolutionDeadline ? Number(gameState.resolutionDeadline) : 0;
+      console.log('🎮 [useGameStateManager] Resolution phase timer:', {
+        resolutionDeadline: gameState.resolutionDeadline?.toString(),
+        resolutionDeadlineNum: deadlineNum,
+        currentTime,
+        timeDiff: deadlineNum - currentTime,
+        resolutionTimeRemaining,
+        resolutionTimeRemainingMinutes: Math.floor(resolutionTimeRemaining / 60),
+        resolutionTimeRemainingSeconds: resolutionTimeRemaining % 60,
+        isZero: resolutionTimeRemaining === 0,
+        deadlineIsZero: gameState.resolutionDeadline === 0n || deadlineNum === 0,
+      });
+    }
+  }, [gameState?.status, gameState?.resolutionDeadline, resolutionTimeRemaining]);
 
   // Check if player is in the game
   const isPlayerInGame = players?.some((p) => p.toLowerCase() === address?.toLowerCase()) ?? false;
@@ -207,6 +240,10 @@ export function useGameStateManager(gameId: bigint | undefined) {
       hasAttemptedTransitionRef.current = true;
       console.log(`🎮 Auto-transitioning game ${gameId} to RESOLUTION - choice deadline passed`);
       transitionToResolution();
+      // Refetch game state after a short delay to get updated resolutionDeadline
+      setTimeout(() => {
+        fetchGameData();
+      }, 2000); // Wait 2 seconds for transaction to be mined
     }
 
     // Reset the ref if game state changes (e.g., game actually transitioned)

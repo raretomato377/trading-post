@@ -12,17 +12,17 @@ A trading prediction game built on Celo, integrated with Farcaster and Pyth Netw
 
 ### Installation
 
-```bash
+   ```bash
 # Install dependencies
-pnpm install
-```
+   pnpm install
+   ```
 
 ### Development
 
-```bash
+   ```bash
 # Start development server
-pnpm dev
-```
+   pnpm dev
+   ```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
@@ -195,8 +195,9 @@ After verification, your contract source code will be visible on the block explo
 2. **Deploy via Vercel Dashboard:**
    - Go to https://vercel.com/new
    - Import your GitHub repository
-   - **Critical**: Set **Root Directory** to `apps/web`
+   - **Critical**: Set **Root Directory** to `apps/web` in Project Settings → General
    - Framework will auto-detect as Next.js
+   - If you see "No Next.js version detected", make sure Root Directory is set to `apps/web` (not the root)
 
 3. **Configure Environment Variables:**
    ```

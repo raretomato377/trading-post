@@ -40,7 +40,7 @@ async function fetchWithRetry(
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    
+
     console.log('RPC Proxy Request:', {
       method: body.method,
       params: body.params ? `${body.params.length} params` : 'no params',

@@ -43,11 +43,11 @@ export function MiniAppProvider({ children, addMiniAppOnLoad }: MiniAppProviderP
   const setMiniAppReady = useCallback(async () => {
     try {
       // Try to get SDK context - this will work if we're in Farcaster
-      try {
-        const context = await sdk.context;
-        if (context) {
+    try {
+      const context = await sdk.context;
+      if (context) {
           console.log("✅ Farcaster SDK context available", context);
-          setContext(context);
+        setContext(context);
         } else {
           // No context means we're not in Farcaster (e.g., localhost)
           console.log("ℹ️ No Farcaster context - running in localhost mode");
