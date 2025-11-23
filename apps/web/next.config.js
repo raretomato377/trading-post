@@ -15,7 +15,7 @@ const nextConfig = {
             // Allow embedding from Farcaster domains using CSP
             // X-Frame-Options is handled by middleware to override Vercel's default
             key: 'Content-Security-Policy',
-            value: "frame-ancestors 'self' https://*.farcaster.xyz https://*.warpcast.com https://warpcast.com;",
+            value: "frame-ancestors 'self' https://warpcast.com https://app.warpcast.com https://client.farcaster.xyz https://farcaster.xyz https://*.warpcast.com https://*.farcaster.xyz;",
           },
         ],
       },
