@@ -75,7 +75,8 @@ export function useCreateGame() {
     
     try {
       // Wagmi will automatically prompt for chain switch if needed when chainId is specified
-      // Try to estimate gas first to get better error messages
+      // Note: The error might come from the wallet itself, not from our code
+      // If the wallet shows "Insufficient balance", it might be a wallet bug or gas estimation issue
       writeContract({
         address: TRADING_CARD_GAME_CONTRACT.address,
         abi: TRADING_CARD_GAME_CONTRACT.abi,
@@ -85,6 +86,7 @@ export function useCreateGame() {
         // If estimation fails, we'll get a better error message
       });
       console.log('🎮 [createGame] writeContract called successfully');
+      console.log('🎮 [createGame] Note: If you see "Insufficient balance" popup, check console for actual error');
     } catch (err: any) {
       console.error('🎮 [createGame] Error calling writeContract:', err);
       
@@ -204,7 +206,41 @@ export function useCreateGame() {
         details: (error as any)?.details,
         data: (error as any)?.data,
         stack: (error as any)?.stack,
+        code: (error as any)?.code,
       });
+      
+      // Log the full error object for debugging
+      try {
+        console.error('🎮 [createGame] Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+      } catch (e) {
+        console.error('🎮 [createGame] Could not stringify error:', e);
+      }
+      
+      // Check if this is a user rejection (they clicked reject in wallet)
+      const errorMessage = error?.message || (error as any)?.shortMessage || String(error);
+      const isUserRejection = errorMessage?.toLowerCase().includes('user rejected') || 
+                               errorMessage?.toLowerCase().includes('user denied') ||
+                               errorMessage?.toLowerCase().includes('rejected the request') ||
+                               (error as any)?.code === 4001 ||
+                               (error as any)?.code === 'ACTION_REJECTED';
+      
+      if (isUserRejection) {
+        console.log('🎮 [createGame] User rejected the transaction - this is normal, no error');
+        return; // Don't show error alert for user rejection
+      }
+      
+      // Check if it's an insufficient balance error
+      if (errorMessage?.toLowerCase().includes('insufficient') || 
+          errorMessage?.toLowerCase().includes('balance') ||
+          errorMessage?.toLowerCase().includes('funds')) {
+        console.error('🎮 [createGame] ⚠️ Insufficient balance error - but user has balance!');
+        console.error('🎮 [createGame] This might be a wallet issue or gas estimation problem');
+        console.error('🎮 [createGame] Try:');
+        console.error('  1. Refreshing the page');
+        console.error('  2. Disconnecting and reconnecting wallet');
+        console.error('  3. Checking if wallet is using correct network');
+        console.error('  4. The wallet might be checking balance on wrong chain');
+      }
     }
   }, [error]);
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAccount, useSwitchChain, useBalance } from "wagmi";
+import { useAccount, useSwitchChain, useBalance, useDisconnect } from "wagmi";
 import { useCreateGame, useJoinGame, useGameState, GameStatus, useNextGameId, usePlayerActiveGame, useAvailableLobbies, useGamePlayers } from "@/hooks/use-trading-game";
 import { CELO_MAINNET_CHAIN_ID } from "@/config/contracts";
 import { formatTimeRemaining } from "@/hooks/use-game-state";
@@ -16,6 +16,7 @@ interface LobbyProps {
 export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps) {
   const { address, isConnected, chainId } = useAccount();
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
+  const { disconnect, isPending: isDisconnecting } = useDisconnect();
   const { createGame, isPending: isCreating, isSuccess: createSuccess, hash, error: createError, receipt, createdGameId: receiptGameId } = useCreateGame();
   const { nextGameId } = useNextGameId();
   const { hasActiveGame, activeGameId, isChecking: isCheckingActiveGame } = usePlayerActiveGame(address);
@@ -279,13 +280,34 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
               Create a new game and wait for other players to join. The game can be started manually
               after the lobby deadline (60 seconds) or when 2+ players join.
             </p>
-            <button
-              onClick={handleCreateGame}
-              disabled={isCreating || !isConnected || hasActiveGame || isCheckingActiveGame}
-              className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
-            >
-              {isCreating ? "Creating..." : isCheckingActiveGame ? "Checking..." : hasActiveGame ? "Already in Game" : "Create New Game"}
-            </button>
+            <div className="space-y-2">
+              <button
+                onClick={handleCreateGame}
+                disabled={isCreating || !isConnected || hasActiveGame || isCheckingActiveGame}
+                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
+              >
+                {isCreating ? "Creating..." : isCheckingActiveGame ? "Checking..." : hasActiveGame ? "Already in Game" : "Create New Game"}
+              </button>
+              
+              {/* Debug: Force reconnect button */}
+              {isConnected && (
+                <button
+                  onClick={() => {
+                    console.log('🎮 [Lobby] Disconnecting wallet to force reconnect...');
+                    disconnect();
+                    // After disconnect, the wallet should auto-reconnect (if in Farcaster)
+                    setTimeout(() => {
+                      console.log('🎮 [Lobby] Wallet disconnected. Please reconnect if needed.');
+                    }, 1000);
+                  }}
+                  disabled={isDisconnecting}
+                  className="w-full bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors duration-200"
+                  title="Disconnect and reconnect wallet (useful for debugging)"
+                >
+                  {isDisconnecting ? "Disconnecting..." : "🔄 Force Reconnect Wallet"}
+                </button>
+              )}
+            </div>
             
             {/* Debug info */}
             {(isCreating || createSuccess || createError) && (
@@ -299,9 +321,19 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
                 {createSuccess && (
                   <p className="text-green-600">✅ Game created! ID: {createdGameId?.toString() || 'loading...'}</p>
                 )}
-                {createError && (
-                  <div className="space-y-2">
-                    <p className="text-red-600 font-semibold">❌ Error: {createError.message}</p>
+                {createError && (() => {
+                  // Don't show error UI for user rejection - that's normal
+                  const isUserRejection = createError.message?.toLowerCase().includes('user rejected') ||
+                                         createError.message?.toLowerCase().includes('user denied') ||
+                                         createError.message?.toLowerCase().includes('rejected the request');
+                  
+                  if (isUserRejection) {
+                    return null; // Don't show error for user rejection
+                  }
+                  
+                  return (
+                    <div className="space-y-2">
+                      <p className="text-red-600 font-semibold">❌ Error: {createError.message}</p>
                     {mightBeChainIssue ? (
                       <div className="mt-2 p-3 bg-orange-50 border border-orange-200 rounded text-xs">
                         <p className="text-orange-800 font-semibold mb-1">⚠️ Wrong Network Detected</p>
@@ -340,8 +372,9 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
                         </p>
                       </div>
                     ) : null}
-                  </div>
-                )}
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
