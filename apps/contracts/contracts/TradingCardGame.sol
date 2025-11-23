@@ -800,6 +800,34 @@ contract TradingCardGame {
         return (score.totalPoints, score.gamesPlayed, score.gamesWon);
     }
 
+    /**
+     * @notice Get the current price for a single Pyth price feed
+     * @param _priceId The Pyth price feed ID
+     * @return price The price structure containing price, conf, expo, and publishTime
+     * @dev This is a read-only view that gets the latest price from Pyth
+     */
+    function getFeedPrice(
+        bytes32 _priceId
+    ) external view returns (PythStructs.Price memory price) {
+        return pyth.getPriceUnsafe(_priceId);
+    }
+
+    /**
+     * @notice Get the current prices for multiple Pyth price feeds
+     * @param _priceIds Array of Pyth price feed IDs
+     * @return prices Array of price structures, one for each feed
+     * @dev This is a read-only view that gets the latest prices from Pyth
+     */
+    function getFeedPrices(
+        bytes32[] memory _priceIds
+    ) external view returns (PythStructs.Price[] memory prices) {
+        prices = new PythStructs.Price[](_priceIds.length);
+        for (uint256 i = 0; i < _priceIds.length; i++) {
+            prices[i] = pyth.getPriceUnsafe(_priceIds[i]);
+        }
+        return prices;
+    }
+
     // ============ Internal Functions ============
 
     /**
