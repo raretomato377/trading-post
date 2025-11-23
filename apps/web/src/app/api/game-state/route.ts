@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createPublicClient, http, parseAbi } from 'viem';
-import { celoSepolia } from 'viem/chains';
+import { celo } from 'viem/chains';
 import { TRADING_CARD_GAME_CONTRACT } from '@/config/contracts';
 
 // Minimal ABI for the functions we need
@@ -11,7 +11,8 @@ const GAME_ABI = parseAbi([
   'function getPlayerChoices(uint256, address) view returns (uint256[3], uint256, bool)',
 ]);
 
-const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || 'https://11142220.rpc.thirdweb.com';
+// Use environment variable or default to Celo Mainnet RPC
+const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || 'https://forno.celo.org';
 
 // Force dynamic rendering since we use searchParams
 export const dynamic = 'force-dynamic';
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
     }
 
     const publicClient = createPublicClient({
-      chain: celoSepolia,
+      chain: celo,
       transport: http(RPC_URL),
     });
 

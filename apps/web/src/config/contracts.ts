@@ -1,4 +1,4 @@
-// RandomNumbers Contract on Celo Sepolia
+// RandomNumbers Contract on Celo Mainnet
 export const RANDOM_NUMBERS_CONTRACT = {
   address: '0x8915604660b2EFd8376C99DB2F1e013CCe30b871' as const,
   abi: [
@@ -46,8 +46,8 @@ export const RANDOM_NUMBERS_CONTRACT = {
   ] as const,
 } as const;
 
-// Celo Sepolia Chain ID (L2)
-export const CELO_SEPOLIA_CHAIN_ID = 11142220;
+// Celo Mainnet Chain ID
+export const CELO_MAINNET_CHAIN_ID = 42220;
 
 // TradingCardGame Contract (placeholder - update after deployment)
 export const TRADING_CARD_GAME_CONTRACT = {

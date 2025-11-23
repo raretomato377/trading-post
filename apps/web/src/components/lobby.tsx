@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useAccount } from "wagmi";
 import { useCreateGame, useJoinGame, useGameState, GameStatus, useNextGameId } from "@/hooks/use-trading-game";
+import { CELO_MAINNET_CHAIN_ID } from "@/config/contracts";
 import { formatTimeRemaining } from "@/hooks/use-game-state";
 
 interface LobbyProps {
@@ -12,11 +13,13 @@ interface LobbyProps {
 }
 
 export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps) {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, chainId } = useAccount();
   const { createGame, isPending: isCreating, isSuccess: createSuccess, hash, error: createError, receipt } = useCreateGame();
   const { joinGame, isPending: isJoining } = useJoinGame(currentGameId);
   const { gameState, isLoading } = useGameState(currentGameId);
   const { nextGameId } = useNextGameId();
+  
+  const isWrongChain = isConnected && chainId !== CELO_MAINNET_CHAIN_ID;
 
   const [localGameId, setLocalGameId] = useState<bigint | undefined>(currentGameId);
   const [createdGameId, setCreatedGameId] = useState<bigint | undefined>(undefined);
@@ -152,7 +155,7 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
                 {isCreating && <p className="text-blue-600">⏳ Creating game...</p>}
                 {hash && (
                   <p className="text-gray-600">
-                    📝 TX: <a href={`https://celo-sepolia.blockscout.com/tx/${hash}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">{hash.slice(0, 10)}...</a>
+                    📝 TX: <a href={`https://celoscan.io/tx/${hash}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">{hash.slice(0, 10)}...</a>
                   </p>
                 )}
                 {createSuccess && (
@@ -171,6 +174,20 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
         <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <p className="text-sm text-yellow-800">
             ⚠️ Please connect your wallet to start or join a game.
+          </p>
+        </div>
+      )}
+
+      {isWrongChain && (
+        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-sm text-red-800 font-semibold mb-1">
+            ⚠️ Wrong Network
+          </p>
+          <p className="text-sm text-red-700">
+            Please switch to <strong>Celo Mainnet</strong> (Chain ID: {CELO_MAINNET_CHAIN_ID}) to interact with the game.
+            {chainId && (
+              <span className="block mt-1">Current: Chain ID {chainId}</span>
+            )}
           </p>
         </div>
       )}

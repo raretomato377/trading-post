@@ -1,5 +1,5 @@
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { TRADING_CARD_GAME_CONTRACT, CELO_SEPOLIA_CHAIN_ID } from "@/config/contracts";
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useSwitchChain } from "wagmi";
+import { TRADING_CARD_GAME_CONTRACT, CELO_MAINNET_CHAIN_ID } from "@/config/contracts";
 import { parseAbiItem } from "viem";
 import { useWatchContractEvent } from "wagmi";
 import { useEffect, useState, useCallback } from "react";
@@ -44,22 +44,40 @@ export interface PlayerScore {
  * Hook to create a new game
  */
 export function useCreateGame() {
+  const { chainId } = useAccount();
+  const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({
     hash,
   });
 
-  const createGame = () => {
+  const createGame = async () => {
     console.log('🎮 [createGame] Starting createGame...');
     console.log('🎮 [createGame] Contract address:', TRADING_CARD_GAME_CONTRACT.address);
-    console.log('🎮 [createGame] Chain ID:', CELO_SEPOLIA_CHAIN_ID);
+    console.log('🎮 [createGame] Target Chain ID:', CELO_MAINNET_CHAIN_ID);
+    console.log('🎮 [createGame] Current Chain ID:', chainId);
+    
+    // Check if we need to switch chains
+    if (chainId !== CELO_MAINNET_CHAIN_ID) {
+      console.log('🎮 [createGame] Chain mismatch detected. Switching to Celo Mainnet...');
+      try {
+        await switchChain({ chainId: CELO_MAINNET_CHAIN_ID });
+        console.log('🎮 [createGame] ✅ Chain switched successfully');
+        // Wait a moment for the chain switch to complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (switchError) {
+        console.error('🎮 [createGame] ❌ Failed to switch chain:', switchError);
+        alert(`Please switch to Celo Mainnet (Chain ID: ${CELO_MAINNET_CHAIN_ID}) to create a game.`);
+        return;
+      }
+    }
     
     try {
       writeContract({
         address: TRADING_CARD_GAME_CONTRACT.address,
         abi: TRADING_CARD_GAME_CONTRACT.abi,
         functionName: "createGame",
-        chainId: CELO_SEPOLIA_CHAIN_ID,
+        chainId: CELO_MAINNET_CHAIN_ID,
       });
       console.log('🎮 [createGame] writeContract called successfully');
     } catch (err) {
@@ -72,7 +90,7 @@ export function useCreateGame() {
   useEffect(() => {
     if (hash) {
       console.log('🎮 [createGame] Transaction hash:', hash);
-      console.log('🎮 [createGame] View on explorer:', `https://celo-sepolia.blockscout.com/tx/${hash}`);
+      console.log('🎮 [createGame] View on explorer:', `https://celoscan.io/tx/${hash}`);
     }
   }, [hash]);
 
@@ -115,7 +133,7 @@ export function useCreateGame() {
   return {
     createGame,
     hash,
-    isPending: isPending || isConfirming,
+    isPending: isPending || isConfirming || isSwitchingChain,
     isSuccess,
     error,
     receipt,
@@ -126,26 +144,40 @@ export function useCreateGame() {
  * Hook to join an existing game
  */
 export function useJoinGame(gameId: bigint | undefined) {
+  const { chainId } = useAccount();
+  const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
   });
 
-  const joinGame = () => {
+  const joinGame = async () => {
+    // Check if we need to switch chains
+    if (chainId !== CELO_MAINNET_CHAIN_ID) {
+      console.log('🎮 [joinGame] Chain mismatch detected. Switching to Celo Mainnet...');
+      try {
+        await switchChain({ chainId: CELO_MAINNET_CHAIN_ID });
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (switchError) {
+        console.error('🎮 [joinGame] ❌ Failed to switch chain:', switchError);
+        alert(`Please switch to Celo Mainnet (Chain ID: ${CELO_MAINNET_CHAIN_ID}) to join a game.`);
+        return;
+      }
+    }
     if (!gameId) return;
     writeContract({
       address: TRADING_CARD_GAME_CONTRACT.address,
       abi: TRADING_CARD_GAME_CONTRACT.abi,
       functionName: "joinGame",
       args: [gameId],
-      chainId: CELO_SEPOLIA_CHAIN_ID,
+      chainId: CELO_MAINNET_CHAIN_ID,
     });
   };
 
   return {
     joinGame,
     hash,
-    isPending: isPending || isConfirming,
+    isPending: isPending || isConfirming || isSwitchingChain,
     isSuccess,
     error,
   };
@@ -191,7 +223,7 @@ export function useBeginGame(gameId: bigint | undefined, gameState?: { lobbyDead
       abi: TRADING_CARD_GAME_CONTRACT.abi,
       functionName: "startGame",
       args: [gameId, false], // Default to insecure randomness
-      chainId: CELO_SEPOLIA_CHAIN_ID,
+      chainId: CELO_MAINNET_CHAIN_ID,
     });
   };
 
@@ -225,7 +257,7 @@ export function useGenerateCards(
       abi: TRADING_CARD_GAME_CONTRACT.abi,
       functionName: "generateCards",
       args: [gameId, useSecureRandomness],
-      chainId: CELO_SEPOLIA_CHAIN_ID,
+      chainId: CELO_MAINNET_CHAIN_ID,
     });
   };
 
@@ -254,7 +286,7 @@ export function useCommitChoices(gameId: bigint | undefined) {
       abi: TRADING_CARD_GAME_CONTRACT.abi,
       functionName: "commitChoices",
       args: [gameId, cardNumbers],
-      chainId: CELO_SEPOLIA_CHAIN_ID,
+      chainId: CELO_MAINNET_CHAIN_ID,
     });
   };
 
@@ -284,7 +316,7 @@ export function useEndGame(gameId: bigint | undefined) {
       abi: TRADING_CARD_GAME_CONTRACT.abi,
       functionName: "endGame",
       args: [gameId],
-      chainId: CELO_SEPOLIA_CHAIN_ID,
+      chainId: CELO_MAINNET_CHAIN_ID,
     });
   };
 
@@ -402,7 +434,7 @@ export function useGamePlayers(gameId: bigint | undefined) {
     abi: TRADING_CARD_GAME_CONTRACT.abi,
     functionName: "getGamePlayers",
     args: gameId ? [gameId] : undefined,
-    chainId: CELO_SEPOLIA_CHAIN_ID,
+    chainId: CELO_MAINNET_CHAIN_ID,
     query: {
       enabled: !!gameId && isPageVisible,
       refetchInterval: isPageVisible ? 20000 : false,
@@ -426,7 +458,7 @@ export function useGameCards(gameId: bigint | undefined) {
     abi: TRADING_CARD_GAME_CONTRACT.abi,
     functionName: "getGameCards",
     args: gameId ? [gameId] : undefined,
-    chainId: CELO_SEPOLIA_CHAIN_ID,
+    chainId: CELO_MAINNET_CHAIN_ID,
     query: {
       enabled: !!gameId && isPageVisible,
       refetchInterval: isPageVisible ? 20000 : false,
@@ -450,7 +482,7 @@ export function usePlayerChoices(gameId: bigint | undefined, playerAddress: `0x$
     abi: TRADING_CARD_GAME_CONTRACT.abi,
     functionName: "getPlayerChoices",
     args: gameId && playerAddress ? [gameId, playerAddress] : undefined,
-    chainId: CELO_SEPOLIA_CHAIN_ID,
+    chainId: CELO_MAINNET_CHAIN_ID,
     query: {
       enabled: !!gameId && !!playerAddress && isPageVisible,
       refetchInterval: isPageVisible ? 20000 : false,
@@ -481,7 +513,7 @@ export function useNextGameId() {
     address: TRADING_CARD_GAME_CONTRACT.address,
     abi: TRADING_CARD_GAME_CONTRACT.abi,
     functionName: "getNextGameId",
-    chainId: CELO_SEPOLIA_CHAIN_ID,
+    chainId: CELO_MAINNET_CHAIN_ID,
     query: {
       enabled: isPageVisible,
       refetchInterval: isPageVisible ? 10000 : false, // Poll every 10 seconds
@@ -504,7 +536,7 @@ export function usePredictionResult(gameId: bigint | undefined, cardNumber: bigi
     abi: TRADING_CARD_GAME_CONTRACT.abi,
     functionName: "getPredictionResult",
     args: gameId && cardNumber !== undefined ? [gameId, cardNumber] : undefined,
-    chainId: CELO_SEPOLIA_CHAIN_ID,
+    chainId: CELO_MAINNET_CHAIN_ID,
     query: {
       enabled: !!gameId && cardNumber !== undefined,
     },
@@ -533,7 +565,7 @@ export function usePlayerScore(playerAddress: `0x${string}` | undefined) {
     abi: TRADING_CARD_GAME_CONTRACT.abi,
     functionName: "getPlayerScore",
     args: playerAddress ? [playerAddress] : undefined,
-    chainId: CELO_SEPOLIA_CHAIN_ID,
+    chainId: CELO_MAINNET_CHAIN_ID,
     query: {
       enabled: !!playerAddress,
     },
@@ -565,7 +597,7 @@ export function useGameEvents(gameId: bigint | undefined, onEvent?: (eventName: 
     address: TRADING_CARD_GAME_CONTRACT.address,
     abi: TRADING_CARD_GAME_CONTRACT.abi,
     eventName: "GameStarted",
-    chainId: CELO_SEPOLIA_CHAIN_ID,
+    chainId: CELO_MAINNET_CHAIN_ID,
     enabled: isEnabled,
     onLogs: (logs: any[]) => {
       const relevantLogs = logs.filter((log: any) => {
@@ -582,7 +614,7 @@ export function useGameEvents(gameId: bigint | undefined, onEvent?: (eventName: 
     address: TRADING_CARD_GAME_CONTRACT.address,
     abi: TRADING_CARD_GAME_CONTRACT.abi,
     eventName: "PlayerJoined",
-    chainId: CELO_SEPOLIA_CHAIN_ID,
+    chainId: CELO_MAINNET_CHAIN_ID,
     enabled: isEnabled,
     onLogs: (logs: any[]) => {
       const relevantLogs = logs.filter((log: any) => {
@@ -599,7 +631,7 @@ export function useGameEvents(gameId: bigint | undefined, onEvent?: (eventName: 
     address: TRADING_CARD_GAME_CONTRACT.address,
     abi: TRADING_CARD_GAME_CONTRACT.abi,
     eventName: "GameActive",
-    chainId: CELO_SEPOLIA_CHAIN_ID,
+    chainId: CELO_MAINNET_CHAIN_ID,
     enabled: isEnabled,
     onLogs: (logs: any[]) => {
       const relevantLogs = logs.filter((log: any) => {
@@ -616,7 +648,7 @@ export function useGameEvents(gameId: bigint | undefined, onEvent?: (eventName: 
     address: TRADING_CARD_GAME_CONTRACT.address,
     abi: TRADING_CARD_GAME_CONTRACT.abi,
     eventName: "ChoicesCommitted",
-    chainId: CELO_SEPOLIA_CHAIN_ID,
+    chainId: CELO_MAINNET_CHAIN_ID,
     enabled: isEnabled,
     onLogs: (logs: any[]) => {
       const relevantLogs = logs.filter((log: any) => {
@@ -633,7 +665,7 @@ export function useGameEvents(gameId: bigint | undefined, onEvent?: (eventName: 
     address: TRADING_CARD_GAME_CONTRACT.address,
     abi: TRADING_CARD_GAME_CONTRACT.abi,
     eventName: "GameEnded",
-    chainId: CELO_SEPOLIA_CHAIN_ID,
+    chainId: CELO_MAINNET_CHAIN_ID,
     enabled: isEnabled,
     onLogs: (logs: any[]) => {
       const relevantLogs = logs.filter((log: any) => {

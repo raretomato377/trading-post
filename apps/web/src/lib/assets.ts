@@ -1,7 +1,7 @@
 import { Asset } from "@/types/card";
 
-// Pyth Price IDs for Celo (Alfajores testnet)
-// TODO: Update with actual Pyth price IDs for Celo
+// Pyth Price IDs for Celo Mainnet
+// TODO: Update with actual Pyth price IDs for Celo Mainnet
 // These are example IDs - replace with real ones from Pyth docs
 export const ASSETS: Asset[] = [
   {

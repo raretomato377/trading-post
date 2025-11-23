@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Primary RPC endpoint
-const PRIMARY_RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || 'https://11142220.rpc.thirdweb.com';
+// Primary RPC endpoint - defaults to Celo Mainnet
+const PRIMARY_RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || 'https://forno.celo.org';
 // Fallback RPC endpoints (add more if needed)
 const FALLBACK_RPC_URLS = [
-  'https://11142220.rpc.thirdweb.com',
-  // Add other RPC endpoints here if available
+  'https://forno.celo.org',
+  'https://rpc.ankr.com/celo',
+  'https://celo-mainnet.infura.io/v3/YOUR_INFURA_KEY', // Replace with your Infura key if using
 ];
 
 // Retry with exponential backoff for rate limits

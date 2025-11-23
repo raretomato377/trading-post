@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createPublicClient, http, parseAbi } from "viem";
-import { celoSepolia } from "viem/chains";
-import { TRADING_CARD_GAME_CONTRACT, CELO_SEPOLIA_CHAIN_ID } from "@/config/contracts";
+import { celo } from "viem/chains";
+import { TRADING_CARD_GAME_CONTRACT, CELO_MAINNET_CHAIN_ID } from "@/config/contracts";
 
 // Verify the request is from Vercel Cron
 function verifyCronRequest(request: NextRequest): boolean {
@@ -36,8 +36,8 @@ export async function GET(request: NextRequest) {
   try {
     // Create a public client to read from the contract
     const publicClient = createPublicClient({
-      chain: celoSepolia,
-      transport: http(process.env.NEXT_PUBLIC_RPC_URL || "https://11142220.rpc.thirdweb.com"),
+      chain: celo,
+      transport: http(process.env.NEXT_PUBLIC_RPC_URL || "https://forno.celo.org"),
     });
 
     // Get contract ABI

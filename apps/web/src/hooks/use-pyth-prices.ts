@@ -12,8 +12,8 @@ const PYTH_ABI = parseAbi([
 
 // Pyth contract addresses for Celo
 const PYTH_CONTRACTS = {
-  alfajores: process.env.NEXT_PUBLIC_PYTH_CONTRACT_ADDRESS || "0x...", // TODO: Add actual address
-  celo: process.env.NEXT_PUBLIC_PYTH_CONTRACT_ADDRESS || "0x...", // TODO: Add actual address
+  alfajores: process.env.NEXT_PUBLIC_PYTH_CONTRACT_ADDRESS_ALFAJORES || "0x...", // Alfajores testnet
+  celo: process.env.NEXT_PUBLIC_PYTH_CONTRACT_ADDRESS || "0x...", // Celo Mainnet
 };
 
 export function usePythPrices() {
@@ -42,8 +42,8 @@ export function usePythPrices() {
       // Step 1: Fetch price update data from Hermes
       const { priceIds, updateData } = await getPriceUpdateDataForAssets(assetIds);
       
-      // Step 2: Get the network to determine contract address
-      const network = (process.env.NEXT_PUBLIC_CELO_NETWORK || "alfajores") as keyof typeof PYTH_CONTRACTS;
+      // Step 2: Get the network to determine contract address (defaults to mainnet)
+      const network = (process.env.NEXT_PUBLIC_CELO_NETWORK || "celo") as keyof typeof PYTH_CONTRACTS;
       const pythAddress = PYTH_CONTRACTS[network];
       
       if (!pythAddress || pythAddress === "0x...") {
