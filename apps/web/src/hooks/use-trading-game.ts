@@ -2,6 +2,7 @@ import { useAccount, useReadContract, useWriteContract, useWaitForTransactionRec
 import { TRADING_CARD_GAME_CONTRACT, CELO_SEPOLIA_CHAIN_ID } from "@/config/contracts";
 import { parseAbiItem } from "viem";
 import { useWatchContractEvent } from "wagmi";
+import { useEffect, useState, useCallback } from "react";
 
 // Game status enum (matches contract)
 export enum GameStatus {
@@ -242,38 +243,97 @@ export function useEndGame(gameId: bigint | undefined) {
 }
 
 /**
+ * Hook to check if page is visible (to pause polling when tab is hidden)
+ */
+function usePageVisibility() {
+  const [isVisible, setIsVisible] = useState(true);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsVisible(!document.hidden);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  return isVisible;
+}
+
+/**
  * Hook to read game state
+ * Uses the consolidated API endpoint to reduce RPC calls
  */
 export function useGameState(gameId: bigint | undefined) {
-  const { data, isLoading, error, refetch } = useReadContract({
-    address: TRADING_CARD_GAME_CONTRACT.address,
-    abi: TRADING_CARD_GAME_CONTRACT.abi,
-    functionName: "getGameState",
-    args: gameId ? [gameId] : undefined,
-    chainId: CELO_SEPOLIA_CHAIN_ID,
-    query: {
-      enabled: !!gameId,
-      refetchInterval: 10000, // Poll every 10 seconds (reduced to avoid rate limits)
-    },
-  });
+  const isPageVisible = usePageVisibility();
+  const [gameState, setGameState] = useState<GameState | undefined>(undefined);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
-  const gameState: GameState | undefined = data
-    ? {
-        status: data[0] as GameStatus,
-        startTime: data[1],
-        lobbyDeadline: data[2],
-        choiceDeadline: data[3],
-        resolutionDeadline: data[4],
-        playerCount: data[5],
-        cardCount: data[6],
+  const fetchGameState = useCallback(async () => {
+    if (!gameId || !isPageVisible) {
+      setGameState(undefined);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const url = new URL('/api/game-state', typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
+      url.searchParams.set('gameId', gameId.toString());
+
+      const response = await fetch(url.toString());
+      if (!response.ok) {
+        throw new Error(`Failed to fetch game state: ${response.statusText}`);
       }
-    : undefined;
+
+      const data = await response.json();
+
+      if (data.gameState) {
+        setGameState({
+          status: data.gameState.status as GameStatus,
+          startTime: BigInt(data.gameState.startTime),
+          lobbyDeadline: BigInt(data.gameState.lobbyDeadline),
+          choiceDeadline: BigInt(data.gameState.choiceDeadline),
+          resolutionDeadline: BigInt(data.gameState.resolutionDeadline),
+          playerCount: BigInt(data.gameState.playerCount),
+          cardCount: BigInt(data.gameState.cardCount),
+        });
+      } else {
+        setGameState(undefined);
+      }
+    } catch (err) {
+      console.error('Failed to fetch game state:', err);
+      setError(err instanceof Error ? err : new Error('Unknown error'));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [gameId, isPageVisible]);
+
+  useEffect(() => {
+    if (!gameId || !isPageVisible) {
+      return;
+    }
+
+    fetchGameState();
+
+    const interval = setInterval(() => {
+      if (isPageVisible) {
+        fetchGameState();
+      }
+    }, 20000);
+
+    return () => clearInterval(interval);
+  }, [gameId, isPageVisible, fetchGameState]);
 
   return {
     gameState,
     isLoading,
     error,
-    refetch,
+    refetch: fetchGameState,
   };
 }
 
@@ -281,6 +341,7 @@ export function useGameState(gameId: bigint | undefined) {
  * Hook to read game players
  */
 export function useGamePlayers(gameId: bigint | undefined) {
+  const isPageVisible = usePageVisibility();
   const { data, isLoading, error } = useReadContract({
     address: TRADING_CARD_GAME_CONTRACT.address,
     abi: TRADING_CARD_GAME_CONTRACT.abi,
@@ -288,8 +349,8 @@ export function useGamePlayers(gameId: bigint | undefined) {
     args: gameId ? [gameId] : undefined,
     chainId: CELO_SEPOLIA_CHAIN_ID,
     query: {
-      enabled: !!gameId,
-      refetchInterval: 5000,
+      enabled: !!gameId && isPageVisible,
+      refetchInterval: isPageVisible ? 20000 : false,
     },
   });
 
@@ -304,6 +365,7 @@ export function useGamePlayers(gameId: bigint | undefined) {
  * Hook to read game cards
  */
 export function useGameCards(gameId: bigint | undefined) {
+  const isPageVisible = usePageVisibility();
   const { data, isLoading, error } = useReadContract({
     address: TRADING_CARD_GAME_CONTRACT.address,
     abi: TRADING_CARD_GAME_CONTRACT.abi,
@@ -311,8 +373,8 @@ export function useGameCards(gameId: bigint | undefined) {
     args: gameId ? [gameId] : undefined,
     chainId: CELO_SEPOLIA_CHAIN_ID,
     query: {
-      enabled: !!gameId,
-      refetchInterval: 5000,
+      enabled: !!gameId && isPageVisible,
+      refetchInterval: isPageVisible ? 20000 : false,
     },
   });
 
@@ -327,6 +389,7 @@ export function useGameCards(gameId: bigint | undefined) {
  * Hook to read player choices
  */
 export function usePlayerChoices(gameId: bigint | undefined, playerAddress: `0x${string}` | undefined) {
+  const isPageVisible = usePageVisibility();
   const { data, isLoading, error } = useReadContract({
     address: TRADING_CARD_GAME_CONTRACT.address,
     abi: TRADING_CARD_GAME_CONTRACT.abi,
@@ -334,8 +397,8 @@ export function usePlayerChoices(gameId: bigint | undefined, playerAddress: `0x$
     args: gameId && playerAddress ? [gameId, playerAddress] : undefined,
     chainId: CELO_SEPOLIA_CHAIN_ID,
     query: {
-      enabled: !!gameId && !!playerAddress,
-      refetchInterval: 5000,
+      enabled: !!gameId && !!playerAddress && isPageVisible,
+      refetchInterval: isPageVisible ? 20000 : false,
     },
   });
 
