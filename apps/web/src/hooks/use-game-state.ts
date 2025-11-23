@@ -199,35 +199,53 @@ export function useGameStateManager(gameId: bigint | undefined) {
   const hasCommitted = playerChoice?.committed ?? false;
 
   // Auto-start game logic: automatically call startGame when lobby deadline passes
-  const { startGame, isPending: isStartingGame } = useStartGame(gameId);
+  const { startGame, isPending: isStartingGame, isSuccess: startSuccess } = useStartGame(gameId);
   const hasAttemptedStartRef = useRef(false);
+  const startSuccessRef = useRef(false);
 
   useEffect(() => {
+    // Track successful start - once successful, never try again for this game
+    if (startSuccess) {
+      startSuccessRef.current = true;
+      hasAttemptedStartRef.current = true;
+      return; // Exit early if already succeeded
+    }
+
+    // If transaction is already pending (from any instance), don't try again
+    if (isStartingGame) {
+      hasAttemptedStartRef.current = true; // Mark as attempted while pending
+      return;
+    }
+
+    // If game is no longer in LOBBY, we don't need to start it
+    if (gameState?.status !== GameStatus.LOBBY) {
+      // Reset refs only if game ended or doesn't exist (for next game)
+      if (gameState?.status === GameStatus.ENDED || !gameState) {
+        hasAttemptedStartRef.current = false;
+        startSuccessRef.current = false;
+      }
+      return;
+    }
+
     // Only attempt to start game if:
     // 1. Wallet is connected (required for transaction)
-    // 2. Game is in LOBBY state
+    // 2. Game is in LOBBY state (already checked above)
     // 3. Lobby deadline has passed
     // 4. We haven't already attempted to start it
-    // 5. We're not currently starting it
+    // 5. Start hasn't already succeeded
     if (
       address && // Wallet must be connected
-      gameState?.status === GameStatus.LOBBY &&
       gameState.lobbyDeadline &&
       lobbyTimeRemaining <= 0 &&
       !hasAttemptedStartRef.current &&
-      !isStartingGame
+      !startSuccessRef.current
     ) {
       hasAttemptedStartRef.current = true;
       console.log(`🎮 Auto-starting game ${gameId} - lobby deadline passed`);
       // This will trigger a wallet popup for approval, but it's automatic
       startGame(false); // Use insecure randomness by default
     }
-
-    // Reset the ref if game state changes (e.g., game actually started)
-    if (gameState?.status !== GameStatus.LOBBY) {
-      hasAttemptedStartRef.current = false;
-    }
-  }, [address, gameState?.status, gameState?.lobbyDeadline, lobbyTimeRemaining, gameId, startGame, isStartingGame]);
+  }, [address, gameState?.status, gameState?.lobbyDeadline, lobbyTimeRemaining, gameId, startGame, isStartingGame, startSuccess]);
 
   // Auto-transition from CHOICE to RESOLUTION when choice deadline passes
   const { transitionToResolution, isPending: isTransitioning, isSuccess: transitionSuccess } = useTransitionToResolution(gameId);
