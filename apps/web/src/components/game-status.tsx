@@ -122,6 +122,7 @@ export function GameStatusDisplay({ gameId }: GameStatusProps) {
       break;
     case GameStatus.CHOICE:
       timeRemaining = choiceTimeRemaining;
+      // Check if player has committed to show different message
       phaseLabel = "Time to choose";
       break;
     case GameStatus.RESOLUTION:

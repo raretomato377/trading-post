@@ -52,10 +52,12 @@ export function CardGame({ gameId, maxSelections = 3, onChoicesCommitted }: Card
     }
   }, [commitSuccess, onChoicesCommitted]);
 
-  // Show cards when game is in CHOICE state OR when player has committed (to show their selections in resolution)
-  // After committing, visually transition to resolution phase even if game state is still CHOICE
-  const canShowCards = gameState?.status === GameStatus.CHOICE || (hasCommitted && gameState?.status !== GameStatus.ENDED);
-  const isInResolutionPhase = hasCommitted || gameState?.status === GameStatus.RESOLUTION;
+  // Show cards when game is in CHOICE or RESOLUTION state
+  const canShowCards = gameState?.status === GameStatus.CHOICE || gameState?.status === GameStatus.RESOLUTION;
+  // Show resolution phase UI only when game is actually in RESOLUTION
+  // If player has committed but game is still CHOICE, show a "waiting" message in the choice phase
+  // This prevents flickering by respecting the actual game state from the API
+  const isInResolutionPhase = gameState?.status === GameStatus.RESOLUTION;
 
   const handleCardClick = (card: Card) => {
     // Don't allow changes if already committed
@@ -137,12 +139,17 @@ export function CardGame({ gameId, maxSelections = 3, onChoicesCommitted }: Card
             </h2>
             <p className="text-lg text-purple-800 mb-4">
               {hasCommitted && gameState?.status === GameStatus.CHOICE
-                ? "Your choices are committed. Waiting for choice phase to end..."
+                ? `Your choices are committed. Waiting for choice phase to end... (${formatTimeRemaining(choiceTimeRemaining)} remaining)`
                 : "Waiting for price resolution..."}
             </p>
             {gameState?.status === GameStatus.RESOLUTION && (
               <p className="text-sm text-purple-600 mb-6">
                 Time remaining: {formatTimeRemaining(resolutionTimeRemaining)}
+              </p>
+            )}
+            {hasCommitted && gameState?.status === GameStatus.CHOICE && choiceTimeRemaining > 0 && (
+              <p className="text-sm text-blue-600 mb-6">
+                Choice phase: {formatTimeRemaining(choiceTimeRemaining)} remaining
               </p>
             )}
             
