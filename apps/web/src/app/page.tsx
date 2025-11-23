@@ -96,15 +96,22 @@ export default function Home() {
   // Track the last known game state to prevent flickering
   // Once we've seen a gameState, keep it until we explicitly leave the game
   const [lastKnownGameState, setLastKnownGameState] = useState<typeof gameState>(undefined);
+  
+  // Track the last known game ID to prevent flickering
+  // Once we've seen a gameId, keep it until we explicitly leave the game
+  const [lastKnownGameId, setLastKnownGameId] = useState<bigint | undefined>(undefined);
 
+  // Use effective game ID (current or last known) to prevent flickering
+  const effectiveGameId = currentGameId || lastKnownGameId;
+  
   // Determine which gameId to use: current active game, or ended game if we're showing results
-  const gameIdForState = showingResults && endedGameId ? endedGameId : currentGameId;
+  const gameIdForState = showingResults && endedGameId ? endedGameId : effectiveGameId;
 
   // Get current game state to determine what to show
   // Don't poll when showing results
   const { gameState, isLoading: isLoadingGameState } = useGameState(showingResults ? undefined : gameIdForState);
   
-  // Track last known game state to prevent flickering
+  // Track last known game state and game ID to prevent flickering
   useEffect(() => {
     if (gameState) {
       setLastKnownGameState(gameState);
@@ -115,16 +122,31 @@ export default function Home() {
     // Otherwise, keep the last known state to prevent flickering
   }, [gameState, currentGameId]);
   
+  useEffect(() => {
+    if (currentGameId !== undefined && currentGameId > 0n) {
+      setLastKnownGameId(currentGameId);
+    } else if (currentGameId === undefined || currentGameId === 0n) {
+      // Only clear lastKnownGameId if we truly have no active game AND we're not showing results
+      // Keep it if we're showing results (so we can continue showing results)
+      if (!showingResults && !endedGameId) {
+        setLastKnownGameId(undefined);
+      }
+    }
+    // Otherwise, keep the last known game ID to prevent flickering
+  }, [currentGameId, showingResults, endedGameId]);
+  
   // Debug: Log game state fetching
   useEffect(() => {
     console.log('🎮 [Page] Game state fetch:', {
       currentGameId: currentGameId?.toString(),
+      lastKnownGameId: lastKnownGameId?.toString(),
+      effectiveGameId: effectiveGameId?.toString(),
       isLoadingGameState,
       gameStateStatus: gameState?.status,
       hasGameState: !!gameState,
       lastKnownStatus: lastKnownGameState?.status,
     });
-  }, [currentGameId, isLoadingGameState, gameState?.status, lastKnownGameState?.status]);
+  }, [currentGameId, lastKnownGameId, effectiveGameId, isLoadingGameState, gameState?.status, lastKnownGameState?.status]);
 
   // Extract user data from context
   const user = context?.user;
@@ -136,9 +158,9 @@ export default function Home() {
   // Show game if player has an active game that's not ENDED (or if gameState is still loading)
   // Show results if player's game has ended
   
-  // Ensure currentGameId is a bigint for comparison
-  const activeGameId = currentGameId && typeof currentGameId === 'bigint' ? currentGameId : 
-                       currentGameId ? BigInt(String(currentGameId)) : undefined;
+  // Ensure effectiveGameId is a bigint for comparison
+  const activeGameId = effectiveGameId && typeof effectiveGameId === 'bigint' ? effectiveGameId : 
+                       effectiveGameId ? BigInt(String(effectiveGameId)) : undefined;
   
   const hasActiveGame = activeGameId !== undefined && activeGameId > 0n; // Player is in a game
   
@@ -147,7 +169,7 @@ export default function Home() {
   
   // Determine if we're in a game based on multiple signals
   // We're in a game if:
-  // 1. We have an activeGameId, OR
+  // 1. We have an activeGameId (current or last known), OR
   // 2. We have a gameState (current or last known) that's not ENDED, OR
   // 3. We're currently checking for an active game (don't show lobby during check)
   const isInGame = hasActiveGame || 
