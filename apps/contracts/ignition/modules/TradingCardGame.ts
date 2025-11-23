@@ -15,6 +15,18 @@ const PYTH_CONTRACTS: Record<string, string> = {
   celo: "0xff1a0f4744e8582DF1aE09D5611b887B6a12925C",
 };
 
+// HyperlaneCelo contract addresses for different networks
+// Update these with your deployed HyperlaneCelo contract addresses
+// You must deploy HyperlaneCelo separately before deploying TradingCardGame
+const HYPERLANE_CELO_CONTRACTS: Record<string, string> = {
+  // Celo Alfajores Testnet
+  alfajores: "0x0000000000000000000000000000000000000000", // TODO: Update with your deployed address
+  // Celo Mainnet
+  celo: "0x2250798199B41CAC81C0A29Abc72204DA6997407",
+  // Celo Sepolia (L2)
+  sepolia: "0x0000000000000000000000000000000000000000", // TODO: Update with your deployed address
+};
+
 const TradingCardGameModule = buildModule("TradingCardGameModule", (m) => {
   // Get the Pyth contract address
   // You MUST provide it as a parameter: --parameters '{"TradingCardGameModule":{"pythAddress":"0x..."}}'
@@ -34,7 +46,25 @@ const TradingCardGameModule = buildModule("TradingCardGameModule", (m) => {
     );
   }
 
-  const tradingCardGame = m.contract("TradingCardGame", [pythAddress]);
+  // Get the HyperlaneCelo contract address
+  // You can provide it as a parameter: --parameters '{"TradingCardGameModule":{"hyperlaneCeloAddress":"0x..."}}'
+  // Or update the HYPERLANE_CELO_CONTRACTS mapping above with your deployed address
+  const hyperlaneCeloAddress = m.getParameter(
+    "hyperlaneCeloAddress",
+    // Default: use address from mapping (update HYPERLANE_CELO_CONTRACTS above)
+    HYPERLANE_CELO_CONTRACTS.celo || "0x0000000000000000000000000000000000000000"
+  );
+
+  // Validate that hyperlaneCeloAddress is provided
+  if (!hyperlaneCeloAddress || hyperlaneCeloAddress.toString() ===  "0x0000000000000000000000000000000000000000") {
+    throw new Error(
+      `HyperlaneCelo contract address is required. ` +
+      `Please provide it via --parameters '{"TradingCardGameModule":{"hyperlaneCeloAddress":"0x..."}}' ` +
+      `Note: HyperlaneCelo must be deployed separately first.`
+    );
+  }
+
+  const tradingCardGame = m.contract("TradingCardGame", [pythAddress, hyperlaneCeloAddress]);
 
   return { tradingCardGame };
 });

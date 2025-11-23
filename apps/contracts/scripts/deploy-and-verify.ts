@@ -31,6 +31,16 @@ const PYTH_CONTRACTS: Record<string, string> = {
   sepolia: "0x0000000000000000000000000000000000000000", // TODO: Update when available
 };
 
+// HyperlaneCelo contract addresses for different networks
+// Update these with your deployed HyperlaneCelo contract addresses
+// You must deploy HyperlaneCelo separately before deploying TradingCardGame
+// Can be overridden with HYPERLANE_CELO_ADDRESS environment variable
+const HYPERLANE_CELO_CONTRACTS: Record<string, string> = {
+  alfajores: "0x0000000000000000000000000000000000000000", // TODO: Update with your deployed address
+  celo: "0x2250798199B41CAC81C0A29Abc72204DA6997407", // TODO: Update with your deployed address
+  sepolia: "0x0000000000000000000000000000000000000000", // TODO: Update with your deployed address
+};
+
 // Chain ID to network name mapping
 const CHAIN_ID_TO_NETWORK: Record<number, string> = {
   42220: "celo",
@@ -43,6 +53,7 @@ interface NetworkConfig {
   chainId: number;
   networkName: string;
   pythAddress: string;
+  hyperlaneCeloAddress: string;
 }
 
 function getNetworkConfig(networkName: string): NetworkConfig {
@@ -63,7 +74,24 @@ function getNetworkConfig(networkName: string): NetworkConfig {
     throw new Error(`Pyth address not configured for network: ${networkName}`);
   }
 
-  return { chainId, networkName, pythAddress };
+  // Get HyperlaneCelo address from environment variable, or use mapping, or throw error
+  // Priority: 1) Environment variable, 2) Mapping in this file
+  const hyperlaneCeloAddress = 
+    process.env.HYPERLANE_CELO_ADDRESS || 
+    HYPERLANE_CELO_CONTRACTS[networkName] || 
+    "";
+  
+  if (!hyperlaneCeloAddress || hyperlaneCeloAddress === "0x0000000000000000000000000000000000000000") {
+    throw new Error(
+      `HyperlaneCelo address is required for network: ${networkName}. ` +
+      `Please either:\n` +
+      `  1. Set HYPERLANE_CELO_ADDRESS environment variable, or\n` +
+      `  2. Update HYPERLANE_CELO_CONTRACTS mapping in this file (deploy-and-verify.ts).\n` +
+      `Note: HyperlaneCelo must be deployed separately first.`
+    );
+  }
+
+  return { chainId, networkName, pythAddress, hyperlaneCeloAddress };
 }
 
 function getDeployedAddress(chainId: number): string | null {
@@ -167,7 +195,8 @@ async function main() {
 
   console.log(`\n🚀 Deploying TradingCardGame to ${networkName}...`);
   console.log(`   Chain ID: ${networkConfig.chainId}`);
-  console.log(`   Pyth Address: ${networkConfig.pythAddress}\n`);
+  console.log(`   Pyth Address: ${networkConfig.pythAddress}`);
+  console.log(`   HyperlaneCelo Address: ${networkConfig.hyperlaneCeloAddress}\n`);
 
   const contractsRoot = path.resolve(__dirname, "..");
   
@@ -204,7 +233,7 @@ async function main() {
   
   // Step 1: Deploy the contract
   const resetFlag = autoReset ? " --reset" : "";
-  const deployCommand = `echo y | npx hardhat ignition deploy ignition/modules/TradingCardGame.ts --network ${networkName}${resetFlag} --parameters '{"TradingCardGameModule":{"pythAddress":"${networkConfig.pythAddress}"}}'`;
+  const deployCommand = `echo y | npx hardhat ignition deploy ignition/modules/TradingCardGame.ts --network ${networkName}${resetFlag} --parameters '{"TradingCardGameModule":{"pythAddress":"${networkConfig.pythAddress}","hyperlaneCeloAddress":"${networkConfig.hyperlaneCeloAddress}"}}'`;
   
   try {
     console.log("📦 Running deployment...");

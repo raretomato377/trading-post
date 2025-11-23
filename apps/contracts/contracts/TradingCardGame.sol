@@ -5,10 +5,27 @@ import "@pythnetwork/pyth-sdk-solidity/IPyth.sol";
 import "@pythnetwork/pyth-sdk-solidity/PythStructs.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
+// Interface that contracts must implement to receive entropy callbacks
+interface IEntropyCallback {
+    /**
+     * @notice Called when entropy is received
+     * @param randomNumber The 32-byte random number from Pyth
+     * @param sequenceNumber The Pyth sequence number for this entropy
+     */
+    function receiveEntropy(bytes32 randomNumber, uint64 sequenceNumber) external;
+}
+
+// Interface for requesting entropy from HyperlaneCelo
+interface IHyperlaneCelo {
+    function requestEntropy() external payable;
+    function quoteRequestEntropy() external view returns (uint256);
+}
+
 /**
  * @title TradingCardGame
  * @notice A game where players select prediction cards and earn points based on market outcomes
  * @dev Uses Pyth Network for price feeds and implements difficulty-based scoring
+ * @dev Uses HyperlaneCelo for secure entropy generation
  */
 contract TradingCardGame is Ownable {
     // ============ Constants ============
@@ -83,6 +100,7 @@ contract TradingCardGame is Ownable {
     // ============ State Variables ============
 
     IPyth public immutable pyth;
+    IHyperlaneCelo public immutable hyperlaneCelo;
     uint256 private nextGameId;
     mapping(uint256 => Game) public games;
     mapping(address => PlayerScore) public playerScores;
@@ -95,6 +113,11 @@ contract TradingCardGame is Ownable {
     // For simplicity, we'll use a mapping from asset index to price ID
     // Frontend will need to provide the correct price IDs when calling updatePricesAndResolve
     mapping(uint256 => bytes32) public assetPriceIds; // assetIndex => priceId
+
+    // Entropy-related state variables
+    mapping(uint256 => bytes32) public gameEntropy; // Maps gameId to entropy randomNumber (0 means not received)
+    mapping(uint256 => bool) public entropyRequested; // Tracks if entropy was requested for a game
+    uint256 public entropyRequestCount; // Counter for entropy requests
 
     // ============ Events ============
 
@@ -117,7 +140,7 @@ contract TradingCardGame is Ownable {
 
     // ============ Constructor ============
 
-    constructor() Ownable(msg.sender) {
+    constructor() {
         // Pyth contract address on Celo mainnet
         pyth = IPyth(0xff1a0f4744e8582DF1aE09D5611b887B6a12925C);
         nextGameId = 1;
@@ -147,6 +170,35 @@ contract TradingCardGame is Ownable {
     }
 
     // ============ Public Functions ============
+
+    /**
+     * @notice Callback function called by HyperlaneCelo when entropy is received
+     * @dev This will be called automatically when the entropy arrives
+     * @dev Uses FIFO approach: assigns entropy to the lowest gameId that requested it but hasn't received it yet
+     * @param randomNumber The 32-byte random number from Pyth
+     * @param sequenceNumber The Pyth sequence number for this entropy
+     */
+    function receiveEntropy(bytes32 randomNumber, uint64 sequenceNumber) external override {
+        // Only accept callbacks from HyperlaneCelo contract
+        require(msg.sender == address(hyperlaneCelo), "Only HyperlaneCelo can call");
+
+        // Find the lowest gameId that requested entropy but hasn't received it yet (FIFO)
+        uint256 targetGameId = 0;
+        for (uint256 i = 1; i < nextGameId; i++) {
+            if (entropyRequested[i] && gameEntropy[i] == bytes32(0)) {
+                targetGameId = i;
+                break; // Found the lowest gameId waiting for entropy
+            }
+        }
+
+        // If we found a game waiting for entropy, assign it
+        require(targetGameId > 0, "No game waiting for entropy");
+
+        // Store the entropy for this game
+        gameEntropy[targetGameId] = randomNumber;
+
+        emit EntropyReceived(targetGameId, randomNumber, sequenceNumber);
+    }
 
     /**
      * @notice Create a new game - anyone can call this
@@ -187,6 +239,9 @@ contract TradingCardGame is Ownable {
         playerActiveGame[msg.sender] = gameId;
 
         emit GameStarted(gameId, msg.sender);
+
+        // Request entropy for this game
+        _requestEntropy(gameId);
 
         return gameId;
     }
@@ -845,6 +900,31 @@ contract TradingCardGame is Ownable {
     // ============ Internal Functions ============
 
     /**
+     * @notice Request entropy from HyperlaneCelo for a game
+     * @param _gameId The game ID
+     * @dev Requests entropy and pays from contract balance
+     */
+    function _requestEntropy(uint256 _gameId) internal {
+        // Check if entropy already requested for this game
+        require(!entropyRequested[_gameId], "Entropy already requested");
+
+        // Get quote for how much it costs
+        uint256 quote = hyperlaneCelo.quoteRequestEntropy();
+
+        // Check contract balance
+        require(address(this).balance >= quote, "Insufficient contract balance");
+
+        // Request the entropy
+        hyperlaneCelo.requestEntropy{value: quote}();
+
+        // Mark as requested
+        entropyRequested[_gameId] = true;
+        entropyRequestCount++;
+
+        emit EntropyRequested(_gameId, entropyRequestCount);
+    }
+
+    /**
      * @notice Internal function to begin a game
      * @param _gameId The game ID
      */
@@ -891,34 +971,27 @@ contract TradingCardGame is Ownable {
     }
 
     /**
-     * @notice Generate cards using secure randomness (placeholder for Pyth randomness)
+     * @notice Generate cards using secure randomness from Hyperlane entropy
      * @param _gameId The game ID
-     * @dev Currently returns static values as a placeholder.
-     *      Will be upgraded to use Pyth Network's randomness oracle in the future.
+     * @dev Uses entropy from HyperlaneCelo if available, otherwise falls back to insecure randomness
      */
     function _generateCardsSecure(uint256 _gameId) internal {
         Game storage game = games[_gameId];
         
-        // TODO: Replace with Pyth Network randomness oracle
-        // For now, use static values as a placeholder
-        // This ensures the function signature and flow are ready for Pyth integration
+        // Check if entropy is available for this game
+        bytes32 entropy = gameEntropy[_gameId];
         
-        // Static placeholder values (will be replaced with Pyth randomness)
-        uint256[10] memory staticCards = [
-            uint256(1234),
-            uint256(5678),
-            uint256(9012),
-            uint256(3456),
-            uint256(7890),
-            uint256(2345),
-            uint256(6789),
-            uint256(4567),
-            uint256(8901),
-            uint256(1357)
-        ];
-        
-        for (uint256 i = 0; i < 10; i++) {
-            game.cards.push(staticCards[i]);
+        if (entropy != bytes32(0)) {
+            // Use entropy to generate cards securely
+            for (uint256 i = 0; i < 10; i++) {
+                // Generate unique randomness for each card using entropy + gameId + index
+                bytes32 cardSeed = keccak256(abi.encodePacked(entropy, _gameId, i));
+                uint256 cardNumber = uint256(cardSeed) % 10000;
+                game.cards.push(cardNumber);
+            }
+        } else {
+            // Entropy not received yet, fallback to insecure randomness
+            _generateCardsInsecure(_gameId);
         }
     }
 
@@ -1001,5 +1074,33 @@ contract TradingCardGame is Ownable {
     function setAssetPriceId(uint256 _assetIndex, bytes32 _priceId) external {
         // TODO: Add access control (onlyOwner or similar)
         assetPriceIds[_assetIndex] = _priceId;
+    }
+
+    /**
+     * @notice Allow contract to receive CELO for paying entropy fees
+     * @dev Anyone can send CELO to fund the contract for entropy requests
+     */
+    receive() external payable {}
+
+    /**
+     * @notice Check if a game has received entropy
+     * @param _gameId The game ID
+     * @return True if the game has received entropy
+     */
+    function hasEntropy(uint256 _gameId) external view validGame(_gameId) returns (bool) {
+        return gameEntropy[_gameId] != bytes32(0);
+    }
+
+    /**
+     * @notice Get entropy request status for a game
+     * @param _gameId The game ID
+     * @return requested Whether entropy was requested for this game
+     * @return received Whether entropy was received for this game
+     */
+    function getEntropyRequestStatus(
+        uint256 _gameId
+    ) external view validGame(_gameId) returns (bool requested, bool received) {
+        requested = entropyRequested[_gameId];
+        received = gameEntropy[_gameId] != bytes32(0);
     }
 }

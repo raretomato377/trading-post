@@ -12,13 +12,15 @@ describe("TradingCardGame", function () {
 
   // Mock Pyth address (in real tests, you'd deploy or use a testnet Pyth contract)
   const MOCK_PYTH_ADDRESS = "0x0000000000000000000000000000000000000001";
+  // Mock HyperlaneCelo address (in real tests, you'd deploy or use a testnet HyperlaneCelo contract)
+  const MOCK_HYPERLANE_CELO_ADDRESS = "0x0000000000000000000000000000000000000002";
 
   beforeEach(async function () {
     [owner, player1, player2] = await ethers.getSigners();
 
     // Deploy TradingCardGame contract
     const TradingCardGameFactory = await ethers.getContractFactory("TradingCardGame");
-    tradingCardGame = await TradingCardGameFactory.deploy(MOCK_PYTH_ADDRESS);
+    tradingCardGame = await TradingCardGameFactory.deploy(MOCK_PYTH_ADDRESS, MOCK_HYPERLANE_CELO_ADDRESS);
     await tradingCardGame.waitForDeployment();
   });
 
