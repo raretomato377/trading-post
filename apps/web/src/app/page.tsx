@@ -87,8 +87,12 @@ export default function Home() {
   // Get player's active game from contract - THIS IS THE SOURCE OF TRUTH
   const { activeGameId: currentGameId, isChecking: isCheckingActiveGame } = usePlayerActiveGame(address);
 
+  // State to track if we're showing results (to stop polling)
+  const [showingResults, setShowingResults] = useState(false);
+
   // Get current game state to determine what to show
-  const { gameState, isLoading: isLoadingGameState } = useGameState(currentGameId);
+  // Don't poll when showing results
+  const { gameState, isLoading: isLoadingGameState } = useGameState(showingResults ? undefined : currentGameId);
   
   // Debug: Log game state fetching
   useEffect(() => {
@@ -123,6 +127,18 @@ export default function Home() {
   const showGame = hasActiveGame && (!gameState || gameState.status !== GameStatus.ENDED);
   // Show results if player's game has ended
   const showResults = hasActiveGame && gameState?.status === GameStatus.ENDED;
+  
+  // Update showingResults state when results should be shown
+  useEffect(() => {
+    setShowingResults(showResults);
+  }, [showResults]);
+  
+  // Handle back from results - clear the showing results state and refresh
+  const handleBackFromResults = () => {
+    setShowingResults(false);
+    // Force a refresh to get the latest active game state
+    window.location.reload();
+  };
   
   // Debug logging
   useEffect(() => {
@@ -222,7 +238,7 @@ export default function Home() {
           )}
 
           {/* Results Display - Show when game has ended */}
-          {showResults && <ResultsDisplay gameId={activeGameId} />}
+          {showResults && <ResultsDisplay gameId={activeGameId} onBack={handleBackFromResults} />}
 
           {/* Leaderboard - Always show */}
           <Leaderboard limit={10} />

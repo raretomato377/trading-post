@@ -22,8 +22,10 @@ export interface GameStateData {
 /**
  * Hook to manage game state with polling and real-time updates
  * Uses a single API endpoint to fetch all game data at once
+ * @param gameId The game ID to fetch state for
+ * @param disablePolling If true, only fetches once and doesn't poll
  */
-export function useGameStateManager(gameId: bigint | undefined) {
+export function useGameStateManager(gameId: bigint | undefined, disablePolling: boolean = false) {
   const { address } = useAccount();
   
   // Normalize gameId to bigint if it's a string or number
@@ -153,7 +155,7 @@ export function useGameStateManager(gameId: bigint | undefined) {
     }
   }, [normalizedGameId]);
 
-  // Poll the API endpoint
+  // Poll the API endpoint (or fetch once if polling is disabled)
   useEffect(() => {
     if (!normalizedGameId || !isPageVisible) {
       return;
@@ -161,6 +163,11 @@ export function useGameStateManager(gameId: bigint | undefined) {
 
     // Fetch immediately
     fetchGameData();
+
+    // If polling is disabled, only fetch once
+    if (disablePolling) {
+      return;
+    }
 
     // Poll at configured interval
     const interval = setInterval(() => {
@@ -170,7 +177,7 @@ export function useGameStateManager(gameId: bigint | undefined) {
     }, POLLING_INTERVAL_MS);
 
     return () => clearInterval(interval);
-  }, [normalizedGameId, isPageVisible, fetchGameData]);
+  }, [normalizedGameId, isPageVisible, fetchGameData, disablePolling]);
 
   // Calculate time remaining for each phase
   const getTimeRemaining = useCallback((deadline: bigint): number => {
