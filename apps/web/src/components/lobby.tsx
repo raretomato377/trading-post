@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAccount } from "wagmi";
+import { useAccount, useSwitchChain } from "wagmi";
 import { useCreateGame, useJoinGame, useGameState, GameStatus, useNextGameId, usePlayerActiveGame, useAvailableLobbies } from "@/hooks/use-trading-game";
 import { CELO_MAINNET_CHAIN_ID } from "@/config/contracts";
 import { formatTimeRemaining } from "@/hooks/use-game-state";
@@ -14,6 +14,7 @@ interface LobbyProps {
 
 export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps) {
   const { address, isConnected, chainId } = useAccount();
+  const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const { createGame, isPending: isCreating, isSuccess: createSuccess, hash, error: createError, receipt } = useCreateGame();
   const { nextGameId } = useNextGameId();
   const { hasActiveGame, activeGameId, isChecking: isCheckingActiveGame } = usePlayerActiveGame(address);
@@ -24,6 +25,15 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
   const { joinGame, isPending: isJoining } = useJoinGame(lobbyToJoin);
   
   const isWrongChain = isConnected && chainId !== CELO_MAINNET_CHAIN_ID;
+
+  const handleSwitchChain = async () => {
+    try {
+      await switchChain({ chainId: CELO_MAINNET_CHAIN_ID });
+    } catch (error) {
+      console.error('Failed to switch chain:', error);
+      alert('Failed to switch chain. Please manually switch to Celo Mainnet in your wallet settings.');
+    }
+  };
 
   const [localGameId, setLocalGameId] = useState<bigint | undefined>(currentGameId);
   const [createdGameId, setCreatedGameId] = useState<bigint | undefined>(undefined);
@@ -241,15 +251,22 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
 
       {isWrongChain && (
         <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-sm text-red-800 font-semibold mb-1">
+          <p className="text-sm text-red-800 font-semibold mb-2">
             ⚠️ Wrong Network
           </p>
-          <p className="text-sm text-red-700">
+          <p className="text-sm text-red-700 mb-3">
             Please switch to <strong>Celo Mainnet</strong> (Chain ID: {CELO_MAINNET_CHAIN_ID}) to interact with the game.
             {chainId && (
               <span className="block mt-1">Current: Chain ID {chainId}</span>
             )}
           </p>
+          <button
+            onClick={handleSwitchChain}
+            disabled={isSwitchingChain}
+            className="w-full bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200 text-sm"
+          >
+            {isSwitchingChain ? "Switching..." : "Switch to Celo Mainnet"}
+          </button>
         </div>
       )}
     </div>
