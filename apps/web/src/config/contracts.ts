@@ -193,5 +193,12 @@ export const TRADING_CARD_GAME_CONTRACT = {
       stateMutability: 'view',
       type: 'function',
     },
+    {
+      inputs: [],
+      name: 'getNextGameId',
+      outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+      stateMutability: 'view',
+      type: 'function',
+    },
   ] as const,
 } as const;

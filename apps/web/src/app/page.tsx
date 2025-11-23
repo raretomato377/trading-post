@@ -147,7 +147,13 @@ export default function Home() {
           )}
 
           {/* Lobby Component - Show when no game or game in LOBBY */}
-          {showLobby && <Lobby currentGameId={currentGameId} onGameJoined={handleGameJoined} />}
+          {showLobby && (
+            <Lobby
+              currentGameId={currentGameId}
+              onGameJoined={handleGameJoined}
+              onGameStarted={handleGameJoined}
+            />
+          )}
 
           {/* Game Status Display - Show when game is active */}
           {showGame && <GameStatusDisplay gameId={currentGameId} />}
