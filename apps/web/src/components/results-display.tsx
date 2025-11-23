@@ -128,9 +128,25 @@ export function ResultsDisplay({ gameId, onBack }: ResultsDisplayProps) {
     }
   };
 
-  // Only show if game has ended and player has committed choices
-  if (!gameId || !playerChoice?.committed || gameState?.status !== GameStatus.ENDED) {
+  // Only show if game has ended
+  // Note: We allow rendering even if playerChoice is temporarily undefined during polling
+  // because we're using effectivePlayerChoice in useGameStateManager
+  if (!gameId || gameState?.status !== GameStatus.ENDED) {
+    console.log('🎮 [ResultsDisplay] Not rendering:', {
+      gameId: gameId?.toString(),
+      hasPlayerChoice: !!playerChoice,
+      playerChoiceCommitted: playerChoice?.committed,
+      gameStateStatus: gameState?.status,
+    });
     return null;
+  }
+  
+  // If playerChoice is not committed, still show results (they might have been committed but data is stale)
+  if (!playerChoice?.committed) {
+    console.log('🎮 [ResultsDisplay] Warning: playerChoice not committed, but showing results anyway:', {
+      gameId: gameId.toString(),
+      hasPlayerChoice: !!playerChoice,
+    });
   }
 
   if (isLoading) {

@@ -49,6 +49,7 @@ export function useGameStateManager(gameId: bigint | undefined, disablePolling: 
   const [players, setPlayers] = useState<readonly `0x${string}`[] | undefined>(undefined);
   const [cards, setCards] = useState<readonly bigint[] | undefined>(undefined);
   const [playerChoice, setPlayerChoice] = useState<PlayerChoice | undefined>(undefined);
+  const [lastKnownPlayerChoice, setLastKnownPlayerChoice] = useState<PlayerChoice | undefined>(undefined); // Track last known playerChoice to prevent flickering
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true); // Track if this is the first load
   const [error, setError] = useState<Error | null>(null);
@@ -122,13 +123,22 @@ export function useGameStateManager(gameId: bigint | undefined, disablePolling: 
       
       if (data.playerChoice) {
         const selectedCards = data.playerChoice.selectedCards.map((c: string) => BigInt(c));
-        setPlayerChoice({
+        const newPlayerChoice = {
           selectedCards: [selectedCards[0], selectedCards[1], selectedCards[2]] as [bigint, bigint, bigint],
           committedAt: BigInt(data.playerChoice.committedAt),
           committed: data.playerChoice.committed,
-        });
+        };
+        setPlayerChoice(newPlayerChoice);
+        // Update last known playerChoice if we have new data
+        setLastKnownPlayerChoice(newPlayerChoice);
       } else {
-        setPlayerChoice(undefined);
+        // Only clear playerChoice if we truly have no gameId (game ended or left)
+        // Otherwise, keep the last known playerChoice to prevent flickering
+        if (!normalizedGameId || normalizedGameId === 0n) {
+          setPlayerChoice(undefined);
+          setLastKnownPlayerChoice(undefined);
+        }
+        // If we still have a gameId but no playerChoice in response, keep last known
       }
       
       // Mark initial load as complete once we have data
@@ -220,8 +230,11 @@ export function useGameStateManager(gameId: bigint | undefined, disablePolling: 
   // Check if player is in the game
   const isPlayerInGame = players?.some((p) => p.toLowerCase() === address?.toLowerCase()) ?? false;
 
-  // Check if player has committed choices
-  const hasCommitted = playerChoice?.committed ?? false;
+  // Use current playerChoice if available, otherwise fall back to lastKnownPlayerChoice to prevent flickering
+  const effectivePlayerChoice = playerChoice || lastKnownPlayerChoice;
+
+  // Check if player has committed choices (use effective playerChoice to prevent flickering)
+  const hasCommitted = effectivePlayerChoice?.committed ?? false;
 
   // Start game logic - users manually call startGame when lobby deadline passes
   const { startGame, isPending: isStartingGame } = useStartGame(normalizedGameId, false);
@@ -294,7 +307,7 @@ export function useGameStateManager(gameId: bigint | undefined, disablePolling: 
     gameState,
     players,
     cards,
-    playerChoice,
+    playerChoice: effectivePlayerChoice, // Use effective playerChoice to prevent flickering
     isLoading,
     error,
     lobbyTimeRemaining,

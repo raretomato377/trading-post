@@ -165,15 +165,6 @@ export default function Home() {
   // 2. Game is not ENDED, AND
   // 3. We're not showing results
   const showGame = isInGame && !showingResults && effectiveGameState?.status !== GameStatus.ENDED;
-  // Show results if:
-  // 1. Player's game has ended (hasActiveGame && effectiveGameState?.status === ENDED), OR
-  // 2. We have an ended game ID stored (persists even after playerActiveGame is cleared), OR
-  // 3. We're explicitly showing results (showingResults flag)
-  // Once showingResults is true, keep showing results until user goes back
-  const showResults = showingResults || 
-                      (hasActiveGame && effectiveGameState?.status === GameStatus.ENDED) || 
-                      (endedGameId !== undefined);
-  
   // Track when a game ends so we can continue showing results even after playerActiveGame is cleared
   // Once showingResults is true, keep it true until user explicitly goes back
   useEffect(() => {
@@ -181,10 +172,23 @@ export default function Home() {
       // Store the ended game ID so we can continue showing results
       setEndedGameId(gameIdForState);
       setShowingResults(true);
+      console.log('🎮 [Page] Game ended, setting showingResults to true:', {
+        gameId: gameIdForState.toString(),
+        status: effectiveGameState.status,
+      });
     }
     // Don't clear showingResults automatically - only clear when user clicks back
     // This prevents the results page from disappearing
   }, [effectiveGameState?.status, gameIdForState]);
+  
+  // Show results if:
+  // 1. We're explicitly showing results (showingResults flag), OR
+  // 2. We have an ended game ID stored (persists even after playerActiveGame is cleared), OR
+  // 3. Player's game has ended (hasActiveGame && effectiveGameState?.status === ENDED)
+  // Priority: showingResults flag > endedGameId > current state check
+  const showResults = showingResults || 
+                      (endedGameId !== undefined) ||
+                      (hasActiveGame && effectiveGameState?.status === GameStatus.ENDED);
   
   // Handle back from results - clear the showing results state and refresh
   const handleBackFromResults = () => {
@@ -220,6 +224,17 @@ export default function Home() {
         activeGameIdType: typeof activeGameId,
         gameStateStatus: gameState?.status,
         hasGameState: !!gameState,
+      });
+    }
+    
+    if (showResults) {
+      console.log('🎮 [Page] 🏆 Rendering Results:', {
+        showResults,
+        showingResults,
+        endedGameId: endedGameId?.toString(),
+        activeGameId: activeGameId?.toString(),
+        effectiveGameStateStatus: effectiveGameState?.status,
+        hasActiveGame,
       });
     }
     
