@@ -1,35 +1,72 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAccount } from "wagmi";
-import { useCreateGame, useJoinGame, useGameState, GameStatus } from "@/hooks/use-trading-game";
+import { useCreateGame, useJoinGame, useGameState, GameStatus, useNextGameId } from "@/hooks/use-trading-game";
 import { formatTimeRemaining } from "@/hooks/use-game-state";
 
 interface LobbyProps {
   currentGameId?: bigint;
   onGameJoined?: (gameId: bigint) => void;
+  onGameStarted?: (gameId: bigint) => void;
 }
 
-export function Lobby({ currentGameId, onGameJoined }: LobbyProps) {
+export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps) {
   const { address, isConnected } = useAccount();
-  const { createGame, isPending: isCreating, isSuccess: createSuccess } = useCreateGame();
+  const { createGame, isPending: isCreating, isSuccess: createSuccess, hash, error: createError, receipt } = useCreateGame();
   const { joinGame, isPending: isJoining } = useJoinGame(currentGameId);
   const { gameState, isLoading } = useGameState(currentGameId);
+  const { nextGameId } = useNextGameId();
 
   const [localGameId, setLocalGameId] = useState<bigint | undefined>(currentGameId);
+  const [createdGameId, setCreatedGameId] = useState<bigint | undefined>(undefined);
 
-  // Handle create game success
-  if (createSuccess && !localGameId) {
-    // Game ID would come from the transaction receipt
-    // For now, we'll need to track it differently
-    // This is a limitation - we'd need to parse the event or use a different approach
-  }
+  // Log all state changes
+  useEffect(() => {
+    console.log('🎮 [Lobby] State update:', {
+      currentGameId: currentGameId?.toString(),
+      localGameId: localGameId?.toString(),
+      createdGameId: createdGameId?.toString(),
+      isConnected,
+      address,
+      isCreating,
+      createSuccess,
+      hash,
+      createError: createError?.message,
+      nextGameId: nextGameId?.toString(),
+    });
+  }, [currentGameId, localGameId, createdGameId, isConnected, address, isCreating, createSuccess, hash, createError, nextGameId]);
+
+  // Try to get game ID after creation
+  useEffect(() => {
+    if (createSuccess && nextGameId) {
+      // The new game ID should be nextGameId - 1 (since nextGameId increments after creation)
+      const newGameId = nextGameId - 1n;
+      console.log('🎮 [Lobby] Game created! New game ID:', newGameId.toString());
+      console.log('🎮 [Lobby] Next game ID:', nextGameId.toString());
+      
+      if (!createdGameId || createdGameId !== newGameId) {
+        setCreatedGameId(newGameId);
+        setLocalGameId(newGameId);
+        if (onGameStarted) {
+          onGameStarted(newGameId);
+        }
+      }
+    }
+  }, [createSuccess, nextGameId, createdGameId, onGameStarted]);
 
   const handleCreateGame = () => {
+    console.log('🎮 [Lobby] handleCreateGame called');
+    console.log('🎮 [Lobby] isConnected:', isConnected);
+    console.log('🎮 [Lobby] address:', address);
+    
     if (!isConnected) {
+      console.warn('🎮 [Lobby] Wallet not connected');
       alert("Please connect your wallet first");
       return;
     }
+    
+    console.log('🎮 [Lobby] Calling createGame()...');
     createGame();
   };
 
@@ -108,6 +145,24 @@ export function Lobby({ currentGameId, onGameJoined }: LobbyProps) {
             >
               {isCreating ? "Creating..." : "Create New Game"}
             </button>
+            
+            {/* Debug info */}
+            {(isCreating || createSuccess || createError) && (
+              <div className="mt-4 p-3 bg-gray-100 rounded text-xs space-y-1">
+                {isCreating && <p className="text-blue-600">⏳ Creating game...</p>}
+                {hash && (
+                  <p className="text-gray-600">
+                    📝 TX: <a href={`https://celo-sepolia.blockscout.com/tx/${hash}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">{hash.slice(0, 10)}...</a>
+                  </p>
+                )}
+                {createSuccess && (
+                  <p className="text-green-600">✅ Game created! ID: {createdGameId?.toString() || 'loading...'}</p>
+                )}
+                {createError && (
+                  <p className="text-red-600">❌ Error: {createError.message}</p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -45,18 +45,73 @@ export interface PlayerScore {
  */
 export function useCreateGame() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+  const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({
     hash,
   });
 
   const createGame = () => {
-    writeContract({
-      address: TRADING_CARD_GAME_CONTRACT.address,
-      abi: TRADING_CARD_GAME_CONTRACT.abi,
-      functionName: "createGame",
-      chainId: CELO_SEPOLIA_CHAIN_ID,
-    });
+    console.log('🎮 [createGame] Starting createGame...');
+    console.log('🎮 [createGame] Contract address:', TRADING_CARD_GAME_CONTRACT.address);
+    console.log('🎮 [createGame] Chain ID:', CELO_SEPOLIA_CHAIN_ID);
+    
+    try {
+      writeContract({
+        address: TRADING_CARD_GAME_CONTRACT.address,
+        abi: TRADING_CARD_GAME_CONTRACT.abi,
+        functionName: "createGame",
+        chainId: CELO_SEPOLIA_CHAIN_ID,
+      });
+      console.log('🎮 [createGame] writeContract called successfully');
+    } catch (err) {
+      console.error('🎮 [createGame] Error calling writeContract:', err);
+      throw err;
+    }
   };
+
+  // Log transaction status changes
+  useEffect(() => {
+    if (hash) {
+      console.log('🎮 [createGame] Transaction hash:', hash);
+      console.log('🎮 [createGame] View on explorer:', `https://celo-sepolia.blockscout.com/tx/${hash}`);
+    }
+  }, [hash]);
+
+  useEffect(() => {
+    if (isPending) {
+      console.log('🎮 [createGame] Transaction pending...');
+    }
+  }, [isPending]);
+
+  useEffect(() => {
+    if (isConfirming) {
+      console.log('🎮 [createGame] Waiting for confirmation...');
+    }
+  }, [isConfirming]);
+
+  useEffect(() => {
+    if (isSuccess && receipt) {
+      console.log('🎮 [createGame] ✅ Transaction confirmed!');
+      console.log('🎮 [createGame] Receipt:', receipt);
+      
+      // Try to extract game ID from events
+      if (receipt.logs) {
+        console.log('🎮 [createGame] Transaction logs:', receipt.logs);
+        // The GameStarted event should contain the gameId
+        // We'll need to parse it from the logs
+      }
+    }
+  }, [isSuccess, receipt]);
+
+  useEffect(() => {
+    if (error) {
+      console.error('🎮 [createGame] ❌ Error:', error);
+      console.error('🎮 [createGame] Error details:', {
+        name: error?.name,
+        message: error?.message,
+        cause: error?.cause,
+      });
+    }
+  }, [error]);
 
   return {
     createGame,
@@ -64,6 +119,7 @@ export function useCreateGame() {
     isPending: isPending || isConfirming,
     isSuccess,
     error,
+    receipt,
   };
 }
 
