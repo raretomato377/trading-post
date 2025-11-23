@@ -1,13 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAccount } from "wagmi";
 import {
-  useGameState,
-  useGamePlayers,
-  useGameCards,
-  usePlayerChoices,
   useEndGame,
   GameStatus,
   type GameState,
+  type PlayerChoice,
 } from "./use-trading-game";
 
 export interface GameStateData {
@@ -15,26 +12,118 @@ export interface GameStateData {
   gameState: GameState | undefined;
   players: readonly `0x${string}`[] | undefined;
   cards: readonly bigint[] | undefined;
-  playerChoice: ReturnType<typeof usePlayerChoices>["choice"];
+  playerChoice: PlayerChoice | undefined;
   isLoading: boolean;
   error: Error | null;
 }
 
 /**
  * Hook to manage game state with polling and real-time updates
+ * Uses a single API endpoint to fetch all game data at once
  */
 export function useGameStateManager(gameId: bigint | undefined) {
   const { address } = useAccount();
-  const { gameState, isLoading: isLoadingState, error: stateError, refetch: refetchState } = useGameState(gameId);
-  const { players, isLoading: isLoadingPlayers, error: playersError } = useGamePlayers(gameId);
-  const { cards, isLoading: isLoadingCards, error: cardsError } = useGameCards(gameId);
-  const { choice: playerChoice, isLoading: isLoadingChoice, error: choiceError } = usePlayerChoices(
-    gameId,
-    address
-  );
+  const [gameState, setGameState] = useState<GameState | undefined>(undefined);
+  const [players, setPlayers] = useState<readonly `0x${string}`[] | undefined>(undefined);
+  const [cards, setCards] = useState<readonly bigint[] | undefined>(undefined);
+  const [playerChoice, setPlayerChoice] = useState<PlayerChoice | undefined>(undefined);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [isPageVisible, setIsPageVisible] = useState(true);
 
-  const isLoading = isLoadingState || isLoadingPlayers || isLoadingCards || isLoadingChoice;
-  const error = stateError || playersError || cardsError || choiceError;
+  // Track page visibility to pause polling when tab is hidden
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsPageVisible(!document.hidden);
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  // Fetch all game data from single endpoint
+  const fetchGameData = useCallback(async () => {
+    if (!gameId) {
+      setGameState(undefined);
+      setPlayers(undefined);
+      setCards(undefined);
+      setPlayerChoice(undefined);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Use relative URL - Next.js will handle the origin
+      const url = new URL('/api/game-state', typeof window !== 'undefined' ? window.location.origin : '');
+      url.searchParams.set('gameId', gameId.toString());
+      if (address) {
+        url.searchParams.set('playerAddress', address);
+      }
+
+      const response = await fetch(url.toString());
+      if (!response.ok) {
+        throw new Error(`Failed to fetch game state: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      // Transform API response to match expected types
+      if (data.gameState) {
+        setGameState({
+          status: data.gameState.status as GameStatus,
+          startTime: BigInt(data.gameState.startTime),
+          lobbyDeadline: BigInt(data.gameState.lobbyDeadline),
+          choiceDeadline: BigInt(data.gameState.choiceDeadline),
+          resolutionDeadline: BigInt(data.gameState.resolutionDeadline),
+          playerCount: BigInt(data.gameState.playerCount),
+          cardCount: BigInt(data.gameState.cardCount),
+        });
+      } else {
+        setGameState(undefined);
+      }
+
+      setPlayers(data.players as `0x${string}`[]);
+      setCards(data.cards?.map((c: string) => BigInt(c)) || []);
+      
+      if (data.playerChoice) {
+        const selectedCards = data.playerChoice.selectedCards.map((c: string) => BigInt(c));
+        setPlayerChoice({
+          selectedCards: [selectedCards[0], selectedCards[1], selectedCards[2]] as [bigint, bigint, bigint],
+          committedAt: BigInt(data.playerChoice.committedAt),
+          committed: data.playerChoice.committed,
+        });
+      } else {
+        setPlayerChoice(undefined);
+      }
+    } catch (err) {
+      console.error('Failed to fetch game data:', err);
+      setError(err instanceof Error ? err : new Error('Unknown error'));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [gameId, address]);
+
+  // Poll the API endpoint
+  useEffect(() => {
+    if (!gameId || !isPageVisible) {
+      return;
+    }
+
+    // Fetch immediately
+    fetchGameData();
+
+    // Then poll every 20 seconds
+    const interval = setInterval(() => {
+      if (isPageVisible) {
+        fetchGameData();
+      }
+    }, 20000);
+
+    return () => clearInterval(interval);
+  }, [gameId, isPageVisible, fetchGameData]);
 
   // Calculate time remaining for each phase
   const getTimeRemaining = useCallback((deadline: bigint): number => {
@@ -93,8 +182,8 @@ export function useGameStateManager(gameId: bigint | undefined) {
 
   // Refetch all data
   const refetch = useCallback(() => {
-    refetchState();
-  }, [refetchState]);
+    fetchGameData();
+  }, [fetchGameData]);
 
   return {
     gameId,
