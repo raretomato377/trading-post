@@ -17,7 +17,9 @@ export function GameStatusDisplay({ gameId }: GameStatusProps) {
     isLoading,
   } = useGameStateManager(gameId);
 
-  if (isLoading || !gameState) {
+  // Only show loading skeleton on initial load (when we have no data yet)
+  // During refreshes, keep showing existing data to prevent flickering
+  if (isLoading && !gameState) {
     // Skeleton loader that matches the actual content structure to prevent layout shift
     return (
       <div className="w-full max-w-2xl mx-auto p-4 rounded-lg border-2 bg-gray-100 border-gray-200 min-h-[140px]">
@@ -44,6 +46,11 @@ export function GameStatusDisplay({ gameId }: GameStatusProps) {
         </div>
       </div>
     );
+  }
+
+  // If we still don't have gameState after loading, return null
+  if (!gameState) {
+    return null;
   }
 
   const status = gameState.status;

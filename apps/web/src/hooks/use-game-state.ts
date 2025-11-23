@@ -31,6 +31,7 @@ export function useGameStateManager(gameId: bigint | undefined) {
   const [cards, setCards] = useState<readonly bigint[] | undefined>(undefined);
   const [playerChoice, setPlayerChoice] = useState<PlayerChoice | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true); // Track if this is the first load
   const [error, setError] = useState<Error | null>(null);
   const [isPageVisible, setIsPageVisible] = useState(true);
 
@@ -52,10 +53,16 @@ export function useGameStateManager(gameId: bigint | undefined) {
       setPlayers(undefined);
       setCards(undefined);
       setPlayerChoice(undefined);
+      setIsInitialLoad(true); // Reset initial load flag when gameId is cleared
       return;
     }
 
-    setIsLoading(true);
+    // Only show loading state if we don't have data yet (initial load)
+    // During refreshes, keep showing existing data to prevent flickering
+    const hasExistingData = gameState !== undefined;
+    if (!hasExistingData) {
+      setIsLoading(true);
+    }
     setError(null);
 
     try {
@@ -101,13 +108,29 @@ export function useGameStateManager(gameId: bigint | undefined) {
       } else {
         setPlayerChoice(undefined);
       }
+      
+      // Mark initial load as complete once we have data
+      if (isInitialLoad && data.gameState) {
+        setIsInitialLoad(false);
+      }
     } catch (err) {
       console.error('Failed to fetch game data:', err);
       setError(err instanceof Error ? err : new Error('Unknown error'));
+      // Only mark initial load as complete on error if we have existing data
+      if (isInitialLoad && gameState) {
+        setIsInitialLoad(false);
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [gameId, address]);
+  }, [gameId, address, gameState, isInitialLoad]);
+
+  // Reset initial load flag when gameId changes
+  useEffect(() => {
+    if (gameId) {
+      setIsInitialLoad(true);
+    }
+  }, [gameId]);
 
   // Poll the API endpoint
   // Note: We use a slightly longer interval here to avoid duplicate polling with useGameState
