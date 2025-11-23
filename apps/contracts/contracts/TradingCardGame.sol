@@ -474,6 +474,50 @@ contract TradingCardGame {
     }
 
     /**
+     * @notice Diagnostic function to check why endGame might fail
+     * @param _gameId The game ID
+     * @return canEnd Whether endGame can be called
+     * @return reason Reason why it can't be called (empty if canEnd is true)
+     * @return gameStatus_ Current game status
+     * @return resolutionDeadline_ Resolution deadline timestamp
+     * @return currentTime Current block timestamp
+     */
+    function canEndGame(uint256 _gameId) external view returns (
+        bool canEnd,
+        string memory reason,
+        GameStatus gameStatus_,
+        uint256 resolutionDeadline_,
+        uint256 currentTime
+    ) {
+        // Check if game exists
+        if (_gameId == 0 || _gameId >= nextGameId) {
+            return (false, "Invalid game ID", GameStatus.LOBBY, 0, block.timestamp);
+        }
+
+        Game storage game = games[_gameId];
+        gameStatus_ = game.status;
+        resolutionDeadline_ = game.resolutionDeadline;
+        currentTime = block.timestamp;
+
+        // Check game status
+        if (game.status != GameStatus.RESOLUTION) {
+            return (false, "Game is not in RESOLUTION status", gameStatus_, resolutionDeadline_, currentTime);
+        }
+
+        // Check resolution deadline
+        if (currentTime < game.resolutionDeadline) {
+            return (false, "Resolution deadline not reached", gameStatus_, resolutionDeadline_, currentTime);
+        }
+
+        // Check if resolutionDeadline is set (shouldn't be 0)
+        if (game.resolutionDeadline == 0) {
+            return (false, "Resolution deadline not set (game may not have transitioned properly)", gameStatus_, resolutionDeadline_, currentTime);
+        }
+
+        return (true, "", gameStatus_, resolutionDeadline_, currentTime);
+    }
+
+    /**
      * @notice Get the next game ID that will be assigned
      * @return The next game ID
      */

@@ -220,6 +220,19 @@ export const TRADING_CARD_GAME_CONTRACT = {
       type: 'function',
     },
     {
+      inputs: [{ internalType: 'uint256', name: '_gameId', type: 'uint256' }],
+      name: 'canEndGame',
+      outputs: [
+        { internalType: 'bool', name: 'canEnd', type: 'bool' },
+        { internalType: 'string', name: 'reason', type: 'string' },
+        { internalType: 'uint8', name: 'gameStatus_', type: 'uint8' },
+        { internalType: 'uint256', name: 'resolutionDeadline_', type: 'uint256' },
+        { internalType: 'uint256', name: 'currentTime', type: 'uint256' },
+      ],
+      stateMutability: 'view',
+      type: 'function',
+    },
+    {
       inputs: [{ internalType: 'address', name: '_player', type: 'address' }],
       name: 'getPlayerScore',
       outputs: [

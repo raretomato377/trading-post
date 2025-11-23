@@ -134,13 +134,6 @@ export function Leaderboard({ limit = 10 }: LeaderboardProps) {
         </div>
       )}
 
-      {/* TODO Marker */}
-      <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <p className="text-xs text-yellow-800">
-          ⚠️ TODO: Contract needs leaderboard function to show full rankings. Currently only showing
-          your score.
-        </p>
-      </div>
     </div>
   );
 }
