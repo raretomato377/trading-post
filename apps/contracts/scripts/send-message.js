@@ -57,7 +57,7 @@ async function main() {
   const message = messageArgs[0] || "Hello from Base to Celo!";
 
   // Configuration
-  const SENDER_ADDRESS = "0x8915604660b2EFd8376C99DB2F1e013CCe30b871"; // Base
+  const SENDER_ADDRESS = "0x37a53234C1d418EaCfB3E52dA09018A1672b95Ee"; // Base
   const RECEIVER_ADDRESS = "0x8Ea7eBc246A8358f8381C89C27Af14074A437BCC"; // Celo
   const CELO_DOMAIN_ID = 42220;
   const BASE_RPC = "https://mainnet.base.org";

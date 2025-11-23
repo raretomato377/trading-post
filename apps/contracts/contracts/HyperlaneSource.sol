@@ -40,6 +40,14 @@ contract HyperlaneSender is Ownable, IEntropyConsumer {
         uint256 hyperlaneValue; // ETH sent for Hyperlane gas
     }
 
+    // Struct for the entropy data sent cross-chain
+    struct EntropyData {
+        bytes32 randomNumber;
+        uint256 entropyLength;
+        uint64 sequenceNumber;
+        address sourceContract;
+    }
+
     // Mapping from sequence number to entropy request details
     mapping(uint64 => EntropyRequest) public pendingRequests;
 
@@ -67,14 +75,22 @@ contract HyperlaneSender is Ownable, IEntropyConsumer {
         EntropyRequest memory request = pendingRequests[sequence];
         require(request.destinationDomain != 0, "No pending request for this sequence");
 
+        // Create structured entropy data for clarity on block explorers
+        EntropyData memory entropyData = EntropyData({
+            randomNumber: randomNumber,
+            entropyLength: 32, // bytes32 = 32 bytes
+            sequenceNumber: sequence,
+            sourceContract: address(this)
+        });
+
         // Convert address to bytes32 for Hyperlane
         bytes32 recipientBytes32 = addressToBytes32(request.recipient);
 
-        // Send the random number via Hyperlane
+        // Send the structured entropy data via Hyperlane
         bytes32 messageId = mailbox.dispatch{value: request.hyperlaneValue}(
             request.destinationDomain,
             recipientBytes32,
-            abi.encode(randomNumber)
+            abi.encode(entropyData)
         );
 
         emit EntropySent(sequence, messageId, randomNumber);

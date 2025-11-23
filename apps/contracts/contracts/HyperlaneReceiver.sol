@@ -11,12 +11,27 @@ contract HyperlaneReceiver {
     // Celo Chain ID: 42220
     address public constant MAILBOX_ADDRESS = 0x50da3B3907A08a24fe4999F4Dcf337E8dC7954bb; // Celo Mailbox
 
-    // 2. State variable to store the last received message
-    string public lastMessage;
+    // Struct for the entropy data received cross-chain
+    struct EntropyData {
+        bytes32 randomNumber;
+        uint256 entropyLength;
+        uint64 sequenceNumber;
+        address sourceContract;
+    }
+
+    // 2. State variable to store the last received entropy data
+    EntropyData public lastEntropyData;
     address public lastSender;
     uint32 public lastOriginDomain;
 
-    event ReceivedMessage(uint32 indexed origin, address indexed sender, string message);
+    event ReceivedMessage(
+        uint32 indexed origin,
+        address indexed sender,
+        bytes32 randomNumber,
+        uint256 entropyLength,
+        uint64 sequenceNumber,
+        address sourceContract
+    );
 
     // 3. Modifier to ensure only the Mailbox can call the handle function
     // This prevents malicious users from faking messages by calling handle() directly.
@@ -28,30 +43,37 @@ contract HyperlaneReceiver {
     /**
      * @notice Handles an incoming message from the Hyperlane Mailbox.
      * @dev This must match the IMessageRecipient interface signature exactly.
-     * 
+     *
      * @param _origin The Domain ID of the chain the message came from (e.g., Base is 8453).
      * @param _sender The address of the sender contract on the origin chain (as bytes32).
-     * @param _messageBody The raw byte data sent (the encoded string).
+     * @param _messageBody The raw byte data sent (the encoded EntropyData struct).
      */
     function handle(
         uint32 _origin,
         bytes32 _sender,
         bytes calldata _messageBody
     ) external onlyMailbox {
-        // 4. Decode the data
-        // Since the sender used `bytes(string)`, we can cast it back directly.
-        string memory receivedString = string(_messageBody);
-        
-        // Convert bytes32 sender back to address for easier readability (optional)
+        // 4. Decode the entropy data
+        // The sender used `abi.encode(entropyData)`, so we decode it back to the struct
+        EntropyData memory entropyData = abi.decode(_messageBody, (EntropyData));
+
+        // Convert bytes32 sender back to address for easier readability
         address senderAddress = bytes32ToAddress(_sender);
 
         // 5. Application Logic
-        // For this example, we just save the data to state
-        lastMessage = receivedString;
+        // Save the entropy data to state
+        lastEntropyData = entropyData;
         lastSender = senderAddress;
         lastOriginDomain = _origin;
 
-        emit ReceivedMessage(_origin, senderAddress, receivedString);
+        emit ReceivedMessage(
+            _origin,
+            senderAddress,
+            entropyData.randomNumber,
+            entropyData.entropyLength,
+            entropyData.sequenceNumber,
+            entropyData.sourceContract
+        );
     }
 
     /**
