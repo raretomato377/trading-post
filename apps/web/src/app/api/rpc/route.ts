@@ -81,8 +81,59 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (!response.ok) {
+    // Check if response is HTML (error page) instead of JSON
+    const contentType = response.headers.get('content-type') || '';
+    const isHTML = contentType.includes('text/html') || contentType.includes('text/plain');
+    
+    if (!response.ok || isHTML) {
       const errorText = await response.text();
+      
+      // If we got HTML, it's likely an error page from the RPC provider
+      if (isHTML || errorText.trim().startsWith('<!')) {
+        console.error('RPC returned HTML instead of JSON:', {
+          status: response.status,
+          statusText: response.statusText,
+          contentType,
+          bodyPreview: errorText.substring(0, 200),
+        });
+        
+        // Try fallback RPC endpoints
+        console.warn('Primary RPC returned HTML, trying fallback endpoints...');
+        for (const fallbackUrl of FALLBACK_RPC_URLS) {
+          if (fallbackUrl === PRIMARY_RPC_URL || fallbackUrl.includes('YOUR_INFURA_KEY')) continue;
+          
+          try {
+            const fallbackResponse = await fetch(fallbackUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(body),
+            });
+            
+            const fallbackContentType = fallbackResponse.headers.get('content-type') || '';
+            if (fallbackResponse.ok && !fallbackContentType.includes('text/html')) {
+              const fallbackData = await fallbackResponse.json();
+              console.log('Fallback RPC succeeded:', fallbackUrl);
+              return NextResponse.json(fallbackData);
+            }
+          } catch (err) {
+            console.warn('Fallback RPC failed:', fallbackUrl, err);
+            continue;
+          }
+        }
+        
+        return NextResponse.json(
+          { 
+            error: 'RPC endpoint unavailable',
+            message: 'The RPC endpoint returned an error page. Please try again later or configure a different RPC URL.',
+            details: errorText.substring(0, 500), // Limit error text length
+            status: response.status 
+          },
+          { status: 503 } // Service Unavailable
+        );
+      }
+      
       console.error('RPC response error:', {
         status: response.status,
         statusText: response.statusText,

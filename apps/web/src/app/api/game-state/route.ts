@@ -63,6 +63,9 @@ export async function GET(request: NextRequest) {
         abi: GAME_ABI,
         functionName: 'getGameState',
         args: [gameIdBigInt],
+      }).catch((err) => {
+        console.error('Error calling getGameState:', err);
+        throw new Error(`Failed to get game state: ${err instanceof Error ? err.message : String(err)}`);
       }),
       // getGamePlayers
       publicClient.readContract({
@@ -70,6 +73,9 @@ export async function GET(request: NextRequest) {
         abi: GAME_ABI,
         functionName: 'getGamePlayers',
         args: [gameIdBigInt],
+      }).catch((err) => {
+        console.error('Error calling getGamePlayers:', err);
+        throw new Error(`Failed to get game players: ${err instanceof Error ? err.message : String(err)}`);
       }),
       // getGameCards
       publicClient.readContract({
@@ -77,6 +83,9 @@ export async function GET(request: NextRequest) {
         abi: GAME_ABI,
         functionName: 'getGameCards',
         args: [gameIdBigInt],
+      }).catch((err) => {
+        console.error('Error calling getGameCards:', err);
+        throw new Error(`Failed to get game cards: ${err instanceof Error ? err.message : String(err)}`);
       }),
       // getPlayerChoices (only if playerAddress provided)
       playerAddress

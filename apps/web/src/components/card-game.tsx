@@ -29,6 +29,7 @@ export function CardGame({ gameId, maxSelections = 3, onChoicesCommitted }: Card
     cards: contractCards,
     playerChoice,
     choiceTimeRemaining,
+    resolutionTimeRemaining,
     hasCommitted,
     isLoading,
   } = useGameStateManager(gameId);
@@ -115,7 +116,7 @@ export function CardGame({ gameId, maxSelections = 3, onChoicesCommitted }: Card
           <div className="text-center py-12 bg-purple-50 rounded-lg border border-purple-200">
             <p className="text-lg text-purple-800">Waiting for price resolution...</p>
             <p className="text-sm text-purple-600 mt-2">
-              Time remaining: {formatTimeRemaining(choiceTimeRemaining)}
+              Time remaining: {formatTimeRemaining(resolutionTimeRemaining)}
             </p>
           </div>
         </div>
