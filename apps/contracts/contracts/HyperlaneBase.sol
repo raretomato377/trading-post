@@ -67,6 +67,14 @@ contract HyperlaneBase is Ownable, IEntropyConsumer {
         entropy = IEntropyV2(ENTROPY_ADDRESS);
     }
 
+    /**
+     * @notice Modifier to ensure only the Mailbox can call the handle function
+     */
+    modifier onlyMailbox() {
+        require(msg.sender == MAILBOX_ADDRESS, "Only Mailbox can call");
+        _;
+    }
+
     // Required by IEntropyConsumer interface
     function getEntropy() internal view override returns (address) {
         return address(entropy);
@@ -206,6 +214,7 @@ contract HyperlaneBase is Ownable, IEntropyConsumer {
     /**
      * @notice Request entropy and relay it to a recipient on a destination chain.
      * @dev Owner only. Requires payment for both Entropy fee and Hyperlane gas.
+     *      Note: Excess payment is refunded to the contract owner, not msg.sender.
      *
      * @param _destinationDomain The Hyperlane Domain ID of the target chain.
      * @param _recipient The address of the contract/wallet receiving the random number.
@@ -214,38 +223,7 @@ contract HyperlaneBase is Ownable, IEntropyConsumer {
         uint32 _destinationDomain,
         address _recipient
     ) external payable onlyOwner {
-        // Calculate required fees
-        uint128 entropyFee = entropy.getFeeV2();
-
-        // Estimate Hyperlane cost for sending 32 bytes (the random number)
-        bytes32 recipientBytes32 = addressToBytes32(_recipient);
-        bytes memory dummyMessage = abi.encode(bytes32(0));
-        uint256 hyperlaneQuote = mailbox.quoteDispatch(
-            _destinationDomain,
-            recipientBytes32,
-            dummyMessage
-        );
-
-        uint256 totalRequired = uint256(entropyFee) + hyperlaneQuote;
-        require(msg.value >= totalRequired, "Insufficient payment");
-
-        // Request entropy from Pyth
-        uint64 sequenceNumber = entropy.requestV2{value: entropyFee}();
-
-        // Store the request details for the callback
-        pendingRequests[sequenceNumber] = EntropyRequest({
-            destinationDomain: _destinationDomain,
-            recipient: _recipient,
-            length: 32,
-            hyperlaneValue: hyperlaneQuote
-        });
-
-        emit EntropyRequested(sequenceNumber, _destinationDomain, _recipient, 32);
-
-        // Refund any excess payment
-        if (msg.value > totalRequired) {
-            payable(msg.sender).transfer(msg.value - totalRequired);
-        }
+        _requestAndRelayEntropyInternal(_destinationDomain, _recipient, msg.value);
     }
 
     /**
