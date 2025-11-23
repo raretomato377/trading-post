@@ -184,15 +184,63 @@ export function useJoinGame(gameId: bigint | undefined) {
 }
 
 /**
- * Hook to begin a game (must be called manually after lobby deadline passes)
+ * Hook to start a game (can be called when lobby deadline passes)
  * @param gameId The game ID
- * @param gameState Optional game state to validate conditions before calling
+ * @param useSecureRandomness If true, uses secure randomness. Defaults to false.
  */
-export function useBeginGame(gameId: bigint | undefined, gameState?: { lobbyDeadline?: bigint; status?: number }) {
+export function useStartGame(gameId: bigint | undefined, useSecureRandomness: boolean = false) {
+  const { chainId } = useAccount();
+  const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
   });
+
+  const startGame = async (secureRandomness: boolean = useSecureRandomness) => {
+    if (!gameId) {
+      console.error("No game ID provided");
+      return;
+    }
+
+    // Check if we need to switch chains
+    if (chainId !== CELO_MAINNET_CHAIN_ID) {
+      console.log('🎮 [startGame] Chain mismatch detected. Switching to Celo Mainnet...');
+      try {
+        await switchChain({ chainId: CELO_MAINNET_CHAIN_ID });
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (switchError) {
+        console.error('🎮 [startGame] ❌ Failed to switch chain:', switchError);
+        alert(`Please switch to Celo Mainnet (Chain ID: ${CELO_MAINNET_CHAIN_ID}) to start the game.`);
+        return;
+      }
+    }
+
+    writeContract({
+      address: TRADING_CARD_GAME_CONTRACT.address,
+      abi: TRADING_CARD_GAME_CONTRACT.abi,
+      functionName: "startGame",
+      args: [gameId, secureRandomness],
+      chainId: CELO_MAINNET_CHAIN_ID,
+    });
+  };
+
+  return {
+    startGame,
+    hash,
+    isPending: isPending || isConfirming || isSwitchingChain,
+    isSuccess,
+    error,
+  };
+}
+
+/**
+ * Hook to begin a game (must be called manually after lobby deadline passes)
+ * @param gameId The game ID
+ * @param gameState Optional game state to validate conditions before calling
+ * @deprecated Use useStartGame instead
+ */
+export function useBeginGame(gameId: bigint | undefined, gameState?: { lobbyDeadline?: bigint; status?: number }) {
+  const { startGame, hash, isPending, isSuccess, error } = useStartGame(gameId);
 
   const beginGame = () => {
     if (!gameId) {
@@ -218,19 +266,13 @@ export function useBeginGame(gameId: bigint | undefined, gameState?: { lobbyDead
       return;
     }
 
-    writeContract({
-      address: TRADING_CARD_GAME_CONTRACT.address,
-      abi: TRADING_CARD_GAME_CONTRACT.abi,
-      functionName: "startGame",
-      args: [gameId, false], // Default to insecure randomness
-      chainId: CELO_MAINNET_CHAIN_ID,
-    });
+    startGame(false);
   };
 
   return {
     beginGame,
     hash,
-    isPending: isPending || isConfirming,
+    isPending,
     isSuccess,
     error,
   };

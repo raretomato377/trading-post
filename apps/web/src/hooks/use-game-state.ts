@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAccount } from "wagmi";
 import {
+  useStartGame,
   useEndGame,
   GameStatus,
   type GameState,
@@ -148,6 +149,37 @@ export function useGameStateManager(gameId: bigint | undefined) {
 
   // Check if player has committed choices
   const hasCommitted = playerChoice?.committed ?? false;
+
+  // Auto-start game logic: automatically call startGame when lobby deadline passes
+  const { startGame, isPending: isStartingGame } = useStartGame(gameId);
+  const hasAttemptedStartRef = useRef(false);
+
+  useEffect(() => {
+    // Only attempt to start game if:
+    // 1. Wallet is connected (required for transaction)
+    // 2. Game is in LOBBY state
+    // 3. Lobby deadline has passed
+    // 4. We haven't already attempted to start it
+    // 5. We're not currently starting it
+    if (
+      address && // Wallet must be connected
+      gameState?.status === GameStatus.LOBBY &&
+      gameState.lobbyDeadline &&
+      lobbyTimeRemaining <= 0 &&
+      !hasAttemptedStartRef.current &&
+      !isStartingGame
+    ) {
+      hasAttemptedStartRef.current = true;
+      console.log(`🎮 Auto-starting game ${gameId} - lobby deadline passed`);
+      // This will trigger a wallet popup for approval, but it's automatic
+      startGame(false); // Use insecure randomness by default
+    }
+
+    // Reset the ref if game state changes (e.g., game actually started)
+    if (gameState?.status !== GameStatus.LOBBY) {
+      hasAttemptedStartRef.current = false;
+    }
+  }, [address, gameState?.status, gameState?.lobbyDeadline, lobbyTimeRemaining, gameId, startGame, isStartingGame]);
 
   // Auto-end game logic: automatically call endGame when resolution deadline passes
   // Note: This will require wallet approval (popup), but happens automatically for the first user to detect it
