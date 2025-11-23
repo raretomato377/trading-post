@@ -111,13 +111,41 @@ export function CardGame({ gameId, maxSelections = 3, onChoicesCommitted }: Card
     }
 
     if (gameState.status === GameStatus.RESOLUTION) {
+      // Show player's selected cards if they committed
+      const playerSelectedCards = playerChoice?.committed && playerChoice.selectedCards
+        ? playerChoice.selectedCards.map((cardNum) => {
+            const card = parsedCards.find((c) => c.cardNumber === Number(cardNum));
+            return card;
+          }).filter((c) => c !== undefined) as Card[]
+        : [];
+
       return (
         <div className="w-full max-w-6xl mx-auto p-6">
-          <div className="text-center py-12 bg-purple-50 rounded-lg border border-purple-200">
-            <p className="text-lg text-purple-800">Waiting for price resolution...</p>
-            <p className="text-sm text-purple-600 mt-2">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">Waiting for Resolution</h2>
+            <p className="text-lg text-purple-800 mb-4">Waiting for price resolution...</p>
+            <p className="text-sm text-purple-600 mb-6">
               Time remaining: {formatTimeRemaining(resolutionTimeRemaining)}
             </p>
+            
+            {/* Show player's committed choices */}
+            {playerSelectedCards.length > 0 && (
+              <div className="mt-8">
+                <h3 className="text-xl font-semibold text-gray-800 mb-4">Your Selected Cards</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 justify-center max-w-4xl mx-auto">
+                  {playerSelectedCards.map((card, index) => (
+                    <div key={`${card.cardNumber}-${index}`} className="flex justify-center">
+                      <PredictionCard
+                        card={card}
+                        isSelected={true}
+                        onClick={() => {}} // Disabled in resolution phase
+                        disabled={true}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       );

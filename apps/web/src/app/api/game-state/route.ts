@@ -6,6 +6,7 @@ import { TRADING_CARD_GAME_CONTRACT } from '@/config/contracts';
 // Minimal ABI for the functions we need
 const GAME_ABI = parseAbi([
   'function getGameState(uint256) view returns (uint8, uint256, uint256, uint256, uint256, uint256, uint256)',
+  'function getGameStateWithPlayer(uint256, address) view returns (uint8, uint256, uint256, uint256, uint256, uint256, uint256, bool, uint256[3])',
   'function getGamePlayers(uint256) view returns (address[])',
   'function getGameCards(uint256) view returns (uint256[])',
   'function getPlayerChoices(uint256, address) view returns (uint256[3], uint256, bool)',
@@ -55,18 +56,45 @@ export async function GET(request: NextRequest) {
 
     // gameIdBigInt is already validated and set above
 
+    // Use getGameStateWithPlayer if playerAddress is provided, otherwise use getGameState
+    const usePlayerSpecificState = !!playerAddress && playerAddress !== '0x0000000000000000000000000000000000000000';
+    
     // Call all contract functions in parallel
-    const [gameState, players, cards, playerChoice] = await Promise.all([
-      // getGameState
-      publicClient.readContract({
-        address: TRADING_CARD_GAME_CONTRACT.address,
-        abi: GAME_ABI,
-        functionName: 'getGameState',
-        args: [gameIdBigInt],
-      }).catch((err) => {
-        console.error('Error calling getGameState:', err);
-        throw new Error(`Failed to get game state: ${err instanceof Error ? err.message : String(err)}`);
-      }),
+    const [gameStateWithPlayer, players, cards] = await Promise.all([
+      // getGameStateWithPlayer or getGameState
+      usePlayerSpecificState
+        ? publicClient.readContract({
+            address: TRADING_CARD_GAME_CONTRACT.address,
+            abi: GAME_ABI,
+            functionName: 'getGameStateWithPlayer',
+            args: [gameIdBigInt, playerAddress as `0x${string}`],
+          }).catch((err) => {
+            console.error('Error calling getGameStateWithPlayer:', err);
+            // Fallback to regular getGameState if the new function doesn't exist yet
+            return publicClient.readContract({
+              address: TRADING_CARD_GAME_CONTRACT.address,
+              abi: GAME_ABI,
+              functionName: 'getGameState',
+              args: [gameIdBigInt],
+            }).then((state) => [
+              state[0], state[1], state[2], state[3], state[4], state[5], state[6],
+              false, // playerHasCommitted
+              [0n, 0n, 0n] as [bigint, bigint, bigint], // playerSelectedCards
+            ]);
+          })
+        : publicClient.readContract({
+            address: TRADING_CARD_GAME_CONTRACT.address,
+            abi: GAME_ABI,
+            functionName: 'getGameState',
+            args: [gameIdBigInt],
+          }).then((state) => [
+            state[0], state[1], state[2], state[3], state[4], state[5], state[6],
+            false, // playerHasCommitted
+            [0n, 0n, 0n] as [bigint, bigint, bigint], // playerSelectedCards
+          ]).catch((err) => {
+            console.error('Error calling getGameState:', err);
+            throw new Error(`Failed to get game state: ${err instanceof Error ? err.message : String(err)}`);
+          }),
       // getGamePlayers
       publicClient.readContract({
         address: TRADING_CARD_GAME_CONTRACT.address,
@@ -87,16 +115,23 @@ export async function GET(request: NextRequest) {
         console.error('Error calling getGameCards:', err);
         throw new Error(`Failed to get game cards: ${err instanceof Error ? err.message : String(err)}`);
       }),
-      // getPlayerChoices (only if playerAddress provided)
-      playerAddress
-        ? publicClient.readContract({
-            address: TRADING_CARD_GAME_CONTRACT.address,
-            abi: GAME_ABI,
-            functionName: 'getPlayerChoices',
-            args: [gameIdBigInt, playerAddress as `0x${string}`],
-          }).catch(() => null) // Return null if player hasn't made choices yet
-        : Promise.resolve(null),
     ]);
+    
+    // Extract game state and player-specific data
+    // gameStateWithPlayer is either:
+    // - [status, startTime, lobbyDeadline, choiceDeadline, resolutionDeadline, playerCount, cardCount, playerHasCommitted, playerSelectedCards] from getGameStateWithPlayer
+    // - [status, startTime, lobbyDeadline, choiceDeadline, resolutionDeadline, playerCount, cardCount, false, [0n, 0n, 0n]] from getGameState fallback
+    const gameState = [
+      gameStateWithPlayer[0],
+      gameStateWithPlayer[1],
+      gameStateWithPlayer[2],
+      gameStateWithPlayer[3],
+      gameStateWithPlayer[4],
+      gameStateWithPlayer[5],
+      gameStateWithPlayer[6],
+    ] as [bigint, bigint, bigint, bigint, bigint, bigint, bigint];
+    const playerHasCommitted = (gameStateWithPlayer[7] ?? false) as boolean;
+    const playerSelectedCards = (gameStateWithPlayer[8] ?? [0n, 0n, 0n]) as [bigint, bigint, bigint];
 
     // Format the response
     const response = {
@@ -113,11 +148,11 @@ export async function GET(request: NextRequest) {
         : null,
       players: players || [],
       cards: cards?.map((c) => c.toString()) || [],
-      playerChoice: playerChoice
+      playerChoice: usePlayerSpecificState
         ? {
-            selectedCards: playerChoice[0].map((c) => c.toString()),
-            committedAt: playerChoice[1].toString(),
-            committed: playerChoice[2],
+            selectedCards: playerSelectedCards.map((c) => c.toString()),
+            committedAt: '0', // Not returned by getGameStateWithPlayer, but we can get it separately if needed
+            committed: playerHasCommitted,
           }
         : null,
     };

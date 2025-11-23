@@ -159,6 +159,26 @@ export const TRADING_CARD_GAME_CONTRACT = {
       type: 'function',
     },
     {
+      inputs: [
+        { internalType: 'uint256', name: '_gameId', type: 'uint256' },
+        { internalType: 'address', name: '_player', type: 'address' },
+      ],
+      name: 'getGameStateWithPlayer',
+      outputs: [
+        { internalType: 'uint8', name: 'status', type: 'uint8' },
+        { internalType: 'uint256', name: 'startTime', type: 'uint256' },
+        { internalType: 'uint256', name: 'lobbyDeadline', type: 'uint256' },
+        { internalType: 'uint256', name: 'choiceDeadline', type: 'uint256' },
+        { internalType: 'uint256', name: 'resolutionDeadline', type: 'uint256' },
+        { internalType: 'uint256', name: 'playerCount', type: 'uint256' },
+        { internalType: 'uint256', name: 'cardCount', type: 'uint256' },
+        { internalType: 'bool', name: 'playerHasCommitted', type: 'bool' },
+        { internalType: 'uint256[3]', name: 'playerSelectedCards', type: 'uint256[3]' },
+      ],
+      stateMutability: 'view',
+      type: 'function',
+    },
+    {
       inputs: [{ internalType: 'uint256', name: '_gameId', type: 'uint256' }],
       name: 'getGamePlayers',
       outputs: [{ internalType: 'address[]', name: '', type: 'address[]' }],

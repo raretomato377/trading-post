@@ -521,6 +521,64 @@ contract TradingCardGame {
     }
 
     /**
+     * @notice Get game state with player-specific information
+     * @param _gameId The game ID
+     * @param _player The player address (can be address(0) if not needed)
+     * @return status Game status
+     * @return startTime Game start time
+     * @return lobbyDeadline Lobby deadline timestamp
+     * @return choiceDeadline Choice deadline timestamp
+     * @return resolutionDeadline Resolution deadline timestamp
+     * @return playerCount Number of players in the game
+     * @return cardCount Number of cards generated
+     * @return playerHasCommitted Whether the specified player has committed their choices
+     * @return playerSelectedCards The player's selected cards (empty if not committed or address(0))
+     */
+    function getGameStateWithPlayer(
+        uint256 _gameId,
+        address _player
+    )
+        external
+        view
+        validGame(_gameId)
+        returns (
+            GameStatus status,
+            uint256 startTime,
+            uint256 lobbyDeadline,
+            uint256 choiceDeadline,
+            uint256 resolutionDeadline,
+            uint256 playerCount,
+            uint256 cardCount,
+            bool playerHasCommitted,
+            uint256[3] memory playerSelectedCards
+        )
+    {
+        Game storage game = games[_gameId];
+        bool hasCommitted = false;
+        uint256[3] memory selectedCards;
+        
+        if (_player != address(0)) {
+            PlayerChoice storage choice = game.choices[_player];
+            hasCommitted = choice.committed;
+            if (hasCommitted) {
+                selectedCards = choice.selectedCards;
+            }
+        }
+        
+        return (
+            game.status,
+            game.startTime,
+            game.lobbyDeadline,
+            game.choiceDeadline,
+            game.resolutionDeadline,
+            game.players.length,
+            game.cards.length,
+            hasCommitted,
+            selectedCards
+        );
+    }
+
+    /**
      * @notice Get all players in a game
      * @param _gameId The game ID
      * @return Array of player addresses

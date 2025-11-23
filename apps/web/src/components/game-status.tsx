@@ -86,14 +86,10 @@ export function GameStatusDisplay({ gameId }: GameStatusProps) {
       </div>
 
       <div className="mt-4 pt-4 border-t border-current border-opacity-20">
-        <div className="grid grid-cols-2 gap-4 text-sm">
+        <div className="text-sm">
           <div>
             <p className="opacity-75">Players</p>
             <p className="text-lg font-semibold">{Number(gameState.playerCount)}</p>
-          </div>
-          <div>
-            <p className="opacity-75">Cards Generated</p>
-            <p className="text-lg font-semibold">{Number(gameState.cardCount)}</p>
           </div>
         </div>
       </div>
