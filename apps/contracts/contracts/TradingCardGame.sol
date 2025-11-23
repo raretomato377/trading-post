@@ -3,13 +3,14 @@ pragma solidity ^0.8.28;
 
 import "@pythnetwork/pyth-sdk-solidity/IPyth.sol";
 import "@pythnetwork/pyth-sdk-solidity/PythStructs.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title TradingCardGame
  * @notice A game where players select prediction cards and earn points based on market outcomes
  * @dev Uses Pyth Network for price feeds and implements difficulty-based scoring
  */
-contract TradingCardGame {
+contract TradingCardGame is Ownable {
     // ============ Constants ============
 
     uint256 public constant LOBBY_DURATION = 60 seconds; // 60 seconds to join
@@ -112,10 +113,11 @@ contract TradingCardGame {
         address indexed player,
         uint256 points
     );
+    event Withdrawn(address indexed recipient, uint256 amount);
 
     // ============ Constructor ============
 
-    constructor() {
+    constructor() Ownable(msg.sender) {
         // Pyth contract address on Celo mainnet
         pyth = IPyth(0xff1a0f4744e8582DF1aE09D5611b887B6a12925C);
         nextGameId = 1;
@@ -131,6 +133,17 @@ contract TradingCardGame {
     modifier gameStatus(uint256 _gameId, GameStatus _status) {
         require(games[_gameId].status == _status, "Invalid game status");
         _;
+    }
+
+    /**
+     * @notice Emergency withdraw function (owner only)
+     * @dev Only use this to recover stuck funds
+     * @param _amount The amount of ETH to withdraw in wei
+     */
+    function emergencyWithdraw(uint256 _amount) external onlyOwner {
+        require(_amount <= address(this).balance, "Insufficient balance");
+        payable(owner()).transfer(_amount);
+        emit Withdrawn(owner(), _amount);
     }
 
     // ============ Public Functions ============
