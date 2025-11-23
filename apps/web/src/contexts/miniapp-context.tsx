@@ -43,19 +43,21 @@ export function MiniAppProvider({ children, addMiniAppOnLoad }: MiniAppProviderP
   const setMiniAppReady = useCallback(async () => {
     try {
       // Try to get SDK context - this will work if we're in Farcaster
-      const context = await sdk.context;
-      if (context) {
-        console.log("✅ Farcaster SDK context available", context);
-        setContext(context);
-        // Call ready() to signal the app is loaded
-        await sdk.actions.ready();
-        console.log("✅ Called sdk.actions.ready()");
-        setIsMiniAppReady(true);
-      } else {
-        // No context means we're not in Farcaster (e.g., localhost)
-        console.log("ℹ️ No Farcaster context - running in localhost mode");
-        setIsMiniAppReady(true);
+      try {
+        const context = await sdk.context;
+        if (context) {
+          console.log("✅ Farcaster SDK context available", context);
+          setContext(context);
+        } else {
+          // No context means we're not in Farcaster (e.g., localhost)
+          console.log("ℹ️ No Farcaster context - running in localhost mode");
+        }
+      } catch (contextErr) {
+        // Context might not be available, that's okay
+        console.log("ℹ️ Farcaster SDK context not available (not in Farcaster context)");
       }
+
+      setIsMiniAppReady(true);
     } catch (err) {
       // If SDK is not available, we're probably on localhost
       console.log("ℹ️ Farcaster SDK not available - running in localhost mode", err);
@@ -64,15 +66,28 @@ export function MiniAppProvider({ children, addMiniAppOnLoad }: MiniAppProviderP
   }, []);
 
   useEffect(() => {
-    // Try to initialize SDK when component mounts
-    // This will work in Farcaster preview tool, Warpcast, or any Farcaster client
+    // Call ready() immediately when component mounts - this is critical for Farcaster
+    // It should be called as early as possible, even before checking context
     if (mounted && !hasAttemptedInit) {
       setHasAttemptedInit(true);
+      
+      // Call ready() immediately - don't wait
+      const callReady = async () => {
+        try {
+          await sdk.actions.ready();
+          console.log("✅ Called sdk.actions.ready() immediately");
+        } catch (readyErr) {
+          // ready() might fail if not in Farcaster context, that's okay
+          console.log("ℹ️ sdk.actions.ready() not available (not in Farcaster context)");
+        }
+        
+        // Then initialize the rest
+        setMiniAppReady();
+      };
+      
       // Use requestAnimationFrame to ensure it runs after hydration
       requestAnimationFrame(() => {
-        setTimeout(() => {
-          setMiniAppReady();
-        }, 100);
+        callReady();
       });
     }
   }, [mounted, hasAttemptedInit, setMiniAppReady]);

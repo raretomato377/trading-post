@@ -5,6 +5,21 @@
       "destination": "https://api.farcaster.xyz/miniapps/hosted-manifest/019aad21-bb42-c435-55cf-f02d34294587",
       "statusCode": 307
     }
+  ],
+  "headers": [
+    {
+      "source": "/:path*",
+      "headers": [
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors 'self' https://*.farcaster.xyz https://*.warpcast.com https://warpcast.com;"
+        }
+      ]
+    }
   ]
 }
 

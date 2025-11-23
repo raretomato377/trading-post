@@ -35,6 +35,51 @@
     },
     "deploy:celo": {
       "dependsOn": ["compile"]
+    },
+    "deploy:game": {
+      "dependsOn": ["compile"]
+    },
+    "deploy:game:alfajores": {
+      "dependsOn": ["compile"]
+    },
+    "deploy:game:sepolia": {
+      "dependsOn": ["compile"]
+    },
+    "deploy:game:celo": {
+      "dependsOn": ["compile"]
+    },
+    "deploy:game:verify:alfajores": {
+      "dependsOn": ["compile"]
+    },
+    "deploy:game:verify:sepolia": {
+      "dependsOn": ["compile"]
+    },
+    "deploy:game:verify:celo": {
+      "dependsOn": ["compile"]
+    },
+    "verify": {
+      "dependsOn": ["compile"]
+    },
+    "verify:alfajores": {
+      "dependsOn": ["compile"]
+    },
+    "verify:sepolia": {
+      "dependsOn": ["compile"]
+    },
+    "verify:celo": {
+      "dependsOn": ["compile"]
+    },
+    "verify:game": {
+      "dependsOn": ["compile"]
+    },
+    "verify:game:alfajores": {
+      "dependsOn": ["compile"]
+    },
+    "verify:game:sepolia": {
+      "dependsOn": ["compile"]
+    },
+    "verify:game:celo": {
+      "dependsOn": ["compile"]
     }
   }
 }
