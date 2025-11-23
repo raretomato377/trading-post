@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAccount } from "wagmi";
 import { Card, PredictionType } from "@/types/card";
-import { parseCards } from "@/lib/card-parser";
+import { parseCards, parseCard } from "@/lib/card-parser";
 import { useGameStateManager } from "@/hooks/use-game-state";
 import { usePlayerScore, GameStatus } from "@/hooks/use-trading-game";
 import { useRouter } from "next/navigation";
@@ -67,29 +67,15 @@ export function ResultsDisplay({ gameId, onBack }: ResultsDisplayProps) {
       }
       
       const resultPromises = cardsToProcess.map(async (cardNumber) => {
-        const card = parsedCards.find((c) => c.cardNumber === Number(cardNumber));
+        let card = parsedCards.find((c) => c.cardNumber === Number(cardNumber));
         if (!card) {
-          const stubCard: Card = {
-            id: `stub-${cardNumber}`,
-            cardNumber: Number(cardNumber),
-            asset: { 
-              id: `stub-asset-${cardNumber}`,
-              symbol: 'STUB', 
-              name: 'Stub Asset',
-              pythPriceId: '',
-              type: 'crypto',
-            },
-            predictionType: PredictionType.PRICE_UP,
-          };
-          return {
-            card: stubCard,
-            correct: true,
-            points: 10,
-            startPrice: 100,
-            currentPrice: 105,
-            priceDiff: 5,
-            priceDiffPercent: 5,
-          };
+          // Parse the card from the cardNumber to get the actual asset
+          try {
+            card = parseCard(Number(cardNumber));
+          } catch (error) {
+            console.error(`Error parsing card ${cardNumber}:`, error);
+            return null;
+          }
         }
 
         let correct = false;
@@ -114,22 +100,53 @@ export function ResultsDisplay({ gameId, onBack }: ResultsDisplayProps) {
           points = correct ? 10 + (seed % 20) : 0;
         }
 
+        // Generate realistic prices based on asset
         const seed = Number(cardNumber);
-        const basePrice = 100 + (seed % 1000);
-        const startPrice = basePrice;
+        const assetSymbol = card.asset.symbol;
         
+        // Base prices for different assets (realistic ranges)
+        const assetPriceRanges: Record<string, { min: number; max: number }> = {
+          'BTC': { min: 35000, max: 45000 },
+          'ETH': { min: 2000, max: 3000 },
+          'SOL': { min: 80, max: 150 },
+          'USDC': { min: 0.99, max: 1.01 },
+          'CELO': { min: 0.5, max: 1.5 },
+          'AAPL': { min: 150, max: 200 },
+          'TSLA': { min: 200, max: 300 },
+          'GOOGL': { min: 120, max: 160 },
+        };
+        
+        const priceRange = assetPriceRanges[assetSymbol] || { min: 50, max: 200 };
+        const priceVariation = (seed % 100) / 100; // 0-1
+        const basePrice = priceRange.min + (priceRange.max - priceRange.min) * priceVariation;
+        
+        // Add small random variation to make it more believable
+        const randomVariation = (Math.random() - 0.5) * (priceRange.max - priceRange.min) * 0.1;
+        const startPrice = Math.round(Math.max(priceRange.min * 0.5, basePrice + randomVariation) * 100) / 100;
+        
+        // Generate smaller, more realistic percentage changes (0.5% to 3%)
         let priceChangePercent = 0;
+        const smallChangeRange = 0.5 + (seed % 25) / 10; // 0.5% to 3%
+        const mediumChangeRange = 1.0 + (seed % 20) / 10; // 1% to 3%
+        
         if (card.predictionType === "price_up") {
-          priceChangePercent = correct ? 5 + (seed % 10) : -(2 + (seed % 5));
+          priceChangePercent = correct 
+            ? smallChangeRange + (Math.random() * 0.5) // 0.5-3.5% if correct
+            : -(0.3 + (seed % 15) / 10); // -0.3% to -1.8% if wrong
         } else if (card.predictionType === "price_down") {
-          priceChangePercent = correct ? -(5 + (seed % 10)) : (2 + (seed % 5));
+          priceChangePercent = correct 
+            ? -(smallChangeRange + (Math.random() * 0.5)) // -0.5% to -3.5% if correct
+            : (0.3 + (seed % 15) / 10); // +0.3% to +1.8% if wrong
         } else {
-          priceChangePercent = correct ? 8 + (seed % 12) : -(3 + (seed % 6));
+          priceChangePercent = correct 
+            ? mediumChangeRange + (Math.random() * 1.0) // 1% to 4% if correct
+            : -(0.5 + (seed % 20) / 10); // -0.5% to -2.5% if wrong
         }
         
-        const currentPrice = startPrice * (1 + priceChangePercent / 100);
-        const priceDiff = currentPrice - startPrice;
-        const priceDiffPercent = priceChangePercent;
+        // Round to 2 decimal places for prices, 2 decimal places for percentages
+        const currentPrice = Math.round((startPrice * (1 + priceChangePercent / 100)) * 100) / 100;
+        const priceDiff = Math.round((currentPrice - startPrice) * 100) / 100;
+        const priceDiffPercent = Math.round(priceChangePercent * 100) / 100;
 
         return {
           card,
