@@ -49,12 +49,6 @@ export function useCreateGame() {
   });
 
   const createGame = () => {
-    if (TRADING_CARD_GAME_CONTRACT.address === '0x0000000000000000000000000000000000000000') {
-      alert('Contract not deployed yet. Please deploy the TradingCardGame contract and update the address in config/contracts.ts');
-      console.error('Contract address not set. Please deploy the contract first.');
-      return;
-    }
-    
     writeContract({
       address: TRADING_CARD_GAME_CONTRACT.address,
       abi: TRADING_CARD_GAME_CONTRACT.abi,
@@ -424,7 +418,7 @@ export function usePlayerScore(playerAddress: `0x${string}` | undefined) {
  */
 export function useGameEvents(gameId: bigint | undefined, onEvent?: (eventName: string, data: any) => void) {
   // Only watch events if contract is deployed and gameId is valid
-  const isEnabled = gameId !== undefined && TRADING_CARD_GAME_CONTRACT.address !== "0x0000000000000000000000000000000000000000";
+  const isEnabled = gameId !== undefined;
 
   useWatchContractEvent({
     address: TRADING_CARD_GAME_CONTRACT.address,
