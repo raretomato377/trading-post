@@ -12,8 +12,8 @@ const PYTH_ABI = parseAbi([
 
 // Pyth contract addresses for Celo
 const PYTH_CONTRACTS = {
-  alfajores: process.env.NEXT_PUBLIC_PYTH_CONTRACT_ADDRESS_ALFAJORES || "0x...", // Alfajores testnet
-  celo: process.env.NEXT_PUBLIC_PYTH_CONTRACT_ADDRESS || "0x...", // Celo Mainnet
+  alfajores: process.env.NEXT_PUBLIC_PYTH_CONTRACT_ADDRESS_ALFAJORES || "0x74f09cb3c7e2A01865f424FD14F6dc9A14E3e94E", // Alfajores testnet
+  celo: process.env.NEXT_PUBLIC_PYTH_CONTRACT_ADDRESS || "0xff1a0f4744e8582DF1aE09D5611b887B6a12925C", // Celo Mainnet
 };
 
 export function usePythPrices() {

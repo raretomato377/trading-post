@@ -1,5 +1,5 @@
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useSwitchChain } from "wagmi";
-import { TRADING_CARD_GAME_CONTRACT, CELO_MAINNET_CHAIN_ID } from "@/config/contracts";
+import { TRADING_CARD_GAME_CONTRACT, CELO_MAINNET_CHAIN_ID, POLLING_INTERVAL_MS } from "@/config/contracts";
 import { parseAbiItem } from "viem";
 import { useWatchContractEvent } from "wagmi";
 import { useEffect, useState, useCallback } from "react";
@@ -411,7 +411,7 @@ export function useGameState(gameId: bigint | undefined) {
       if (isPageVisible) {
         fetchGameState();
       }
-    }, 20000);
+    }, POLLING_INTERVAL_MS);
 
     return () => clearInterval(interval);
   }, [gameId, isPageVisible, fetchGameState]);
@@ -437,7 +437,7 @@ export function useGamePlayers(gameId: bigint | undefined) {
     chainId: CELO_MAINNET_CHAIN_ID,
     query: {
       enabled: !!gameId && isPageVisible,
-      refetchInterval: isPageVisible ? 20000 : false,
+      refetchInterval: isPageVisible ? POLLING_INTERVAL_MS : false,
     },
   });
 
@@ -461,7 +461,7 @@ export function useGameCards(gameId: bigint | undefined) {
     chainId: CELO_MAINNET_CHAIN_ID,
     query: {
       enabled: !!gameId && isPageVisible,
-      refetchInterval: isPageVisible ? 20000 : false,
+      refetchInterval: isPageVisible ? POLLING_INTERVAL_MS : false,
     },
   });
 
@@ -485,7 +485,7 @@ export function usePlayerChoices(gameId: bigint | undefined, playerAddress: `0x$
     chainId: CELO_MAINNET_CHAIN_ID,
     query: {
       enabled: !!gameId && !!playerAddress && isPageVisible,
-      refetchInterval: isPageVisible ? 20000 : false,
+      refetchInterval: isPageVisible ? POLLING_INTERVAL_MS : false,
     },
   });
 
@@ -516,7 +516,7 @@ export function useNextGameId() {
     chainId: CELO_MAINNET_CHAIN_ID,
     query: {
       enabled: isPageVisible,
-      refetchInterval: isPageVisible ? 10000 : false, // Poll every 10 seconds
+      refetchInterval: isPageVisible ? POLLING_INTERVAL_MS : false,
     },
   });
 

@@ -49,9 +49,19 @@ export const RANDOM_NUMBERS_CONTRACT = {
 // Celo Mainnet Chain ID
 export const CELO_MAINNET_CHAIN_ID = 42220;
 
-// TradingCardGame Contract (placeholder - update after deployment)
+// Polling interval for contract reads (in milliseconds)
+// Can be configured via NEXT_PUBLIC_POLLING_INTERVAL_MS environment variable
+// Defaults to 10 seconds (10000ms)
+export const POLLING_INTERVAL_MS = parseInt(
+  process.env.NEXT_PUBLIC_POLLING_INTERVAL_MS || '10000',
+  10
+);
+
+// TradingCardGame Contract
+// Address can be set via NEXT_PUBLIC_TRADING_GAME_CONTRACT_ADDRESS environment variable
+// Falls back to hardcoded address if env var is not set
 export const TRADING_CARD_GAME_CONTRACT = {
-  address: '0x40df882537ccFA98e39715C9f8459f72247c076A' as const, // TODO: Update after deployment
+  address: (process.env.NEXT_PUBLIC_TRADING_GAME_CONTRACT_ADDRESS || '0x40df882537ccFA98e39715C9f8459f72247c076A') as `0x${string}`,
   abi: [
     {
       inputs: [],

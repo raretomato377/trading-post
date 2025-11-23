@@ -6,6 +6,7 @@ import {
   type GameState,
   type PlayerChoice,
 } from "./use-trading-game";
+import { POLLING_INTERVAL_MS } from "@/config/contracts";
 
 export interface GameStateData {
   gameId: bigint | undefined;
@@ -115,12 +116,12 @@ export function useGameStateManager(gameId: bigint | undefined) {
     // Fetch immediately
     fetchGameData();
 
-    // Then poll every 20 seconds
+    // Poll at configured interval
     const interval = setInterval(() => {
       if (isPageVisible) {
         fetchGameData();
       }
-    }, 20000);
+    }, POLLING_INTERVAL_MS);
 
     return () => clearInterval(interval);
   }, [gameId, isPageVisible, fetchGameData]);
