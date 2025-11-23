@@ -101,6 +101,11 @@ export function CardGame({ gameId, maxSelections = 3, onChoicesCommitted }: Card
     );
   }
 
+  // Don't show anything if game has ended (results component will handle that)
+  if (gameState?.status === GameStatus.ENDED) {
+    return null;
+  }
+
   // Show message if game is not in a state where cards can be shown
   if (!canShowCards && gameState) {
     // Show waiting message if in LOBBY or if cards haven't been generated yet
@@ -171,17 +176,6 @@ export function CardGame({ gameId, maxSelections = 3, onChoicesCommitted }: Card
                 </div>
               </div>
             )}
-          </div>
-        </div>
-      );
-    }
-
-    if (gameState.status === GameStatus.ENDED) {
-      return (
-        <div className="w-full max-w-6xl mx-auto p-6">
-          <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
-            <p className="text-lg text-gray-800">Game has ended</p>
-            <p className="text-sm text-gray-600 mt-2">Check results to see your score!</p>
           </div>
         </div>
       );

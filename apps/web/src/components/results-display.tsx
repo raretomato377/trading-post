@@ -28,8 +28,16 @@ export function ResultsDisplay({ gameId, onBack }: ResultsDisplayProps) {
   const [totalPoints, setTotalPoints] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Get player's lifetime score
-  const { score: playerScore } = usePlayerScore(address);
+  // Get player's lifetime score - refetch after game ends to get updated scores
+  const { score: playerScore, refetch: refetchScore } = usePlayerScore(address);
+  
+  // Refetch score when results are loaded (in case endGame just completed)
+  useEffect(() => {
+    if (!isLoading && results.length > 0) {
+      // Refetch score to get latest updates after endGame
+      refetchScore();
+    }
+  }, [isLoading, results.length, refetchScore]);
 
   // Parse cards from contract
   const parsedCards = contractCards ? parseCards(contractCards.map((c) => Number(c))) : [];
