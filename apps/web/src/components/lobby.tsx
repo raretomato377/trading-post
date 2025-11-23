@@ -247,7 +247,7 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
                       <div className="mt-2 p-3 bg-orange-50 border border-orange-200 rounded text-xs">
                         <p className="text-orange-800 font-semibold mb-1">⚠️ Wrong Network Detected</p>
                         <p className="text-orange-700 mb-2">
-                          This error might be because you're on the wrong network. Please switch to Celo Mainnet first.
+                          This error might be because you&apos;re on the wrong network. Please switch to Celo Mainnet first.
                           {chainId && (
                             <span className="block mt-1">Current: Chain ID {chainId} (Expected: {CELO_MAINNET_CHAIN_ID})</span>
                           )}
@@ -354,7 +354,7 @@ export function Lobby({ currentGameId, onGameJoined, onGameStarted }: LobbyProps
             )}
           </p>
           <p className="text-xs text-red-600 mb-3 p-2 bg-red-100 rounded">
-            💡 <strong>Important:</strong> If you're seeing "Insufficient balance" errors, it's because you're on the wrong network. 
+            💡 <strong>Important:</strong> If you&apos;re seeing &quot;Insufficient balance&quot; errors, it&apos;s because you&apos;re on the wrong network. 
             Your CELO is on Celo Mainnet, but your wallet is currently on {chainId === 8453 ? "Base" : `Chain ${chainId}`}. 
             Switch to Celo Mainnet first, then try creating a game again.
           </p>

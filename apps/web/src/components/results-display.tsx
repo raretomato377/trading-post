@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useAccount } from "wagmi";
 import { Card } from "@/types/card";
 import { parseCards } from "@/lib/card-parser";
-import { usePlayerChoices, usePredictionResult, useGameCards } from "@/hooks/use-trading-game";
 import { useGameStateManager } from "@/hooks/use-game-state";
 
 interface PredictionResult {
