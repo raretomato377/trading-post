@@ -15,14 +15,8 @@ export function GameStatusDisplay({ gameId }: GameStatusProps) {
     choiceTimeRemaining,
     resolutionTimeRemaining,
     isLoading,
-    showStartGameButton,
-    showEndChoiceButton,
     showEndGameButton,
-    manualStartGame,
-    manualTransitionToResolution,
     manualEndGame,
-    isStartingGame,
-    isTransitioning,
     isEndingGame,
   } = useGameStateManager(gameId);
 
@@ -135,33 +129,7 @@ export function GameStatusDisplay({ gameId }: GameStatusProps) {
         </div>
       )}
 
-      {/* Manual retry buttons for failed auto-transitions */}
-      {showStartGameButton && (
-        <div className="mt-4 pt-4 border-t border-current border-opacity-20">
-          <p className="text-sm mb-2 opacity-75">Ready to start. Click to begin the game:</p>
-          <button
-            onClick={manualStartGame}
-            disabled={isStartingGame}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200 text-sm"
-          >
-            {isStartingGame ? "Starting Game..." : "Start Game"}
-          </button>
-        </div>
-      )}
-
-      {showEndChoiceButton && (
-        <div className="mt-4 pt-4 border-t border-current border-opacity-20">
-          <p className="text-sm mb-2 opacity-75">Choice phase ended. Click to proceed to resolution:</p>
-          <button
-            onClick={manualTransitionToResolution}
-            disabled={isTransitioning}
-            className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200 text-sm"
-          >
-            {isTransitioning ? "Transitioning..." : "End Choice Phase"}
-          </button>
-        </div>
-      )}
-
+      {/* End game button - only show when resolution deadline has passed */}
       {showEndGameButton && (
         <div className="mt-4 pt-4 border-t border-current border-opacity-20">
           <p className="text-sm mb-2 opacity-75">Resolution phase ended. Click to finalize scores:</p>

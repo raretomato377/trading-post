@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAccount } from "wagmi";
 import {
-  useStartGame,
   useEndGame,
-  useTransitionToResolution,
   GameStatus,
   type GameState,
   type PlayerChoice,
@@ -198,260 +196,34 @@ export function useGameStateManager(gameId: bigint | undefined) {
   // Check if player has committed choices
   const hasCommitted = playerChoice?.committed ?? false;
 
-  // Auto-start game logic: automatically call startGame when lobby deadline passes
-  const { startGame, isPending: isStartingGame, isSuccess: startSuccess, error: startError } = useStartGame(gameId);
-  const hasAttemptedStartRef = useRef(false);
-  const startSuccessRef = useRef(false);
-  const [startRejected, setStartRejected] = useState(false);
+  // Phases are now determined by timestamps automatically
+  // No need for startGame or transitionToResolution - cards are generated lazily in commitChoices
 
-  // Check if start was rejected by user
-  useEffect(() => {
-    if (startError) {
-      const errorMessage = startError?.message || (startError as any)?.shortMessage || String(startError);
-      const isUserRejection = errorMessage?.toLowerCase().includes('user rejected') || 
-                               errorMessage?.toLowerCase().includes('user denied') ||
-                               errorMessage?.toLowerCase().includes('rejected the request') ||
-                               (startError as any)?.code === 4001 ||
-                               (startError as any)?.code === 'ACTION_REJECTED';
-      
-      if (isUserRejection && hasAttemptedStartRef.current) {
-        setStartRejected(true);
-        hasAttemptedStartRef.current = false; // Allow manual retry
-      }
-    }
-  }, [startError]);
-
-  useEffect(() => {
-    // Track successful start - once successful, never try again for this game
-    if (startSuccess) {
-      startSuccessRef.current = true;
-      hasAttemptedStartRef.current = true;
-      setStartRejected(false);
-      return; // Exit early if already succeeded
-    }
-
-    // If transaction is already pending (from any instance), don't try again
-    if (isStartingGame) {
-      hasAttemptedStartRef.current = true; // Mark as attempted while pending
-      return;
-    }
-
-    // If game is no longer in LOBBY, we don't need to start it
-    if (gameState?.status !== GameStatus.LOBBY) {
-      // Reset refs only if game ended or doesn't exist (for next game)
-      if (gameState?.status === GameStatus.ENDED || !gameState) {
-        hasAttemptedStartRef.current = false;
-        startSuccessRef.current = false;
-        setStartRejected(false);
-      }
-      return;
-    }
-
-    // Only attempt to start game if:
-    // 1. Wallet is connected (required for transaction)
-    // 2. Game is in LOBBY state (already checked above)
-    // 3. Lobby deadline has passed
-    // 4. We haven't already attempted to start it (or it was rejected)
-    // 5. Start hasn't already succeeded
-    if (
-      address && // Wallet must be connected
-      gameState.lobbyDeadline &&
-      lobbyTimeRemaining <= 0 &&
-      !hasAttemptedStartRef.current &&
-      !startSuccessRef.current &&
-      !startRejected
-    ) {
-      hasAttemptedStartRef.current = true;
-      console.log(`🎮 Auto-starting game ${gameId} - lobby deadline passed`);
-      // This will trigger a wallet popup for approval, but it's automatic
-      startGame(false); // Use insecure randomness by default
-    }
-  }, [address, gameState?.status, gameState?.lobbyDeadline, lobbyTimeRemaining, gameId, startGame, isStartingGame, startSuccess]);
-
-  // Manual retry function for starting game
-  const manualStartGame = useCallback(() => {
-    if (!gameId || gameState?.status !== GameStatus.LOBBY) return;
-    hasAttemptedStartRef.current = false;
-    setStartRejected(false);
-    startGame(false);
-  }, [gameId, gameState?.status, startGame]);
-
-  // Auto-transition from CHOICE to RESOLUTION when choice deadline passes
-  const { transitionToResolution, isPending: isTransitioning, isSuccess: transitionSuccess, error: transitionError } = useTransitionToResolution(gameId);
-  const hasAttemptedTransitionRef = useRef(false);
-  const transitionSuccessRef = useRef(false);
-  const [transitionRejected, setTransitionRejected] = useState(false);
-
-  // Check if transition was rejected by user
-  useEffect(() => {
-    if (transitionError) {
-      const errorMessage = transitionError?.message || (transitionError as any)?.shortMessage || String(transitionError);
-      const isUserRejection = errorMessage?.toLowerCase().includes('user rejected') || 
-                               errorMessage?.toLowerCase().includes('user denied') ||
-                               errorMessage?.toLowerCase().includes('rejected the request') ||
-                               (transitionError as any)?.code === 4001 ||
-                               (transitionError as any)?.code === 'ACTION_REJECTED';
-      
-      if (isUserRejection && hasAttemptedTransitionRef.current) {
-        setTransitionRejected(true);
-        hasAttemptedTransitionRef.current = false; // Allow manual retry
-      }
-    }
-  }, [transitionError]);
-
-  useEffect(() => {
-    // Only attempt to transition if:
-    // 1. Wallet is connected (required for transaction)
-    // 2. Game is in CHOICE state
-    // 3. Choice deadline has passed
-    // 4. We haven't already attempted to transition (or it was rejected)
-    // 5. We're not currently transitioning
-    // 6. Transition hasn't already succeeded
-    if (
-      address &&
-      gameState?.status === GameStatus.CHOICE &&
-      gameState.choiceDeadline &&
-      choiceTimeRemaining <= 0 &&
-      !hasAttemptedTransitionRef.current &&
-      !isTransitioning &&
-      !transitionSuccessRef.current &&
-      !transitionRejected
-    ) {
-      hasAttemptedTransitionRef.current = true;
-      console.log(`🎮 Auto-transitioning game ${gameId} to RESOLUTION - choice deadline passed`);
-      transitionToResolution();
-    }
-
-    // Track successful transition
-    if (transitionSuccess && !transitionSuccessRef.current) {
-      transitionSuccessRef.current = true;
-      setTransitionRejected(false);
-      // Refetch game state after successful transition
-      setTimeout(() => {
-        fetchGameData();
-      }, 2000); // Wait 2 seconds for transaction to be indexed
-    }
-
-    // Reset the refs if game state changes (e.g., game actually transitioned or reset)
-    if (gameState?.status === GameStatus.RESOLUTION || gameState?.status === GameStatus.ENDED) {
-      // Transition succeeded, keep refs set to prevent re-triggering
-      if (gameState?.status === GameStatus.RESOLUTION) {
-        hasAttemptedTransitionRef.current = true;
-        transitionSuccessRef.current = true;
-        setTransitionRejected(false);
-      }
-    } else if (gameState?.status === GameStatus.CHOICE && transitionSuccessRef.current) {
-      // Game went back to CHOICE (shouldn't happen, but reset if it does)
-      hasAttemptedTransitionRef.current = false;
-      transitionSuccessRef.current = false;
-      setTransitionRejected(false);
-    }
-  }, [address, gameState?.status, gameState?.choiceDeadline, choiceTimeRemaining, gameId, transitionToResolution, isTransitioning, transitionSuccess, fetchGameData]);
-
-  // Manual retry function for transitioning to resolution
-  const manualTransitionToResolution = useCallback(() => {
-    if (!gameId || gameState?.status !== GameStatus.CHOICE) {
-      console.warn('🎮 [manualTransitionToResolution] Cannot transition: invalid gameId or status');
-      return;
-    }
+  // End game logic - users manually call endGame when resolution deadline passes
+  const { endGame, isPending: isEndingGame } = useEndGame(gameId);
+  
+  // Manual function to end game (called by user when resolution deadline passes)
+  const manualEndGame = useCallback(() => {
+    if (!gameId) return;
     if (!address) {
-      console.warn('🎮 [manualTransitionToResolution] Wallet not connected');
       alert('Please connect your wallet first');
       return;
     }
-    console.log('🎮 [manualTransitionToResolution] Manual transition triggered');
-    hasAttemptedTransitionRef.current = false;
-    setTransitionRejected(false);
-    transitionToResolution();
-  }, [gameId, gameState?.status, address, transitionToResolution]);
-
-  // Auto-end game logic: automatically call endGame when resolution deadline passes
-  // The first user to encounter the expired deadline will trigger the endGame transaction
-  const { endGame, isPending: isEndingGame, error: endError } = useEndGame(gameId);
-  const hasAttemptedEndRef = useRef(false);
-  const [endRejected, setEndRejected] = useState(false);
-
-  // Check if end was rejected by user
-  useEffect(() => {
-    if (endError) {
-      const errorMessage = endError?.message || (endError as any)?.shortMessage || String(endError);
-      const isUserRejection = errorMessage?.toLowerCase().includes('user rejected') || 
-                               errorMessage?.toLowerCase().includes('user denied') ||
-                               errorMessage?.toLowerCase().includes('rejected the request') ||
-                               (endError as any)?.code === 4001 ||
-                               (endError as any)?.code === 'ACTION_REJECTED';
-      
-      if (isUserRejection && hasAttemptedEndRef.current) {
-        setEndRejected(true);
-        hasAttemptedEndRef.current = false; // Allow manual retry
-      }
-    }
-  }, [endError]);
-
-  useEffect(() => {
-    // Only attempt to end game if:
-    // 1. Wallet is connected (required for transaction)
-    // 2. Game is in RESOLUTION state
-    // 3. Resolution deadline has passed (resolutionTimeRemaining <= 0)
-    // 4. We haven't already attempted to end it (or it was rejected)
-    // 5. We're not currently ending it
-    if (
-      address && // Wallet must be connected
-      gameState?.status === GameStatus.RESOLUTION &&
-      gameState.resolutionDeadline &&
-      resolutionTimeRemaining <= 0 && // Deadline has passed
-      !hasAttemptedEndRef.current &&
-      !isEndingGame &&
-      !endRejected
-    ) {
-      hasAttemptedEndRef.current = true;
-      console.log(`🎮 Auto-ending game ${gameId} - resolution deadline passed`);
-      // This will trigger a wallet popup for approval, but it's automatic
-      // Only the first user to see the expired deadline will trigger this
-      endGame();
-    }
-
-    // Reset the ref if game state changes (e.g., game actually ended)
-    if (gameState?.status === GameStatus.ENDED) {
-      hasAttemptedEndRef.current = false;
-      setEndRejected(false);
-    }
-  }, [address, gameState?.status, gameState?.resolutionDeadline, resolutionTimeRemaining, gameId, endGame, isEndingGame]);
-
-  // Manual retry function for ending game
-  const manualEndGame = useCallback(() => {
-    if (!gameId || gameState?.status !== GameStatus.RESOLUTION) return;
-    hasAttemptedEndRef.current = false;
-    setEndRejected(false);
     endGame();
-  }, [gameId, gameState?.status, endGame]);
+  }, [gameId, address, endGame]);
 
   // Refetch all data
   const refetch = useCallback(() => {
     fetchGameData();
   }, [fetchGameData]);
 
-  // Determine if manual retry buttons should be shown
-  const showStartGameButton = 
-    address &&
-    gameState?.status === GameStatus.LOBBY &&
-    gameState.lobbyDeadline &&
-    lobbyTimeRemaining <= 0 &&
-    (startRejected || (!isStartingGame && !startSuccessRef.current));
-
-  const showEndChoiceButton = 
-    address &&
-    gameState?.status === GameStatus.CHOICE &&
-    gameState.choiceDeadline &&
-    choiceTimeRemaining <= 0 &&
-    (transitionRejected || (!isTransitioning && !transitionSuccessRef.current));
-
+  // Show end game button when resolution deadline has passed
   const showEndGameButton = 
     address &&
     gameState?.status === GameStatus.RESOLUTION &&
     gameState.resolutionDeadline &&
     resolutionTimeRemaining <= 0 &&
-    (endRejected || (!isEndingGame && gameState?.status === GameStatus.RESOLUTION));
+    !isEndingGame;
 
   return {
     gameId,
@@ -467,17 +239,11 @@ export function useGameStateManager(gameId: bigint | undefined) {
     isPlayerInGame,
     hasCommitted,
     refetch,
-    // Manual retry functions
-    manualStartGame,
-    manualTransitionToResolution,
+    // Manual function to end game
     manualEndGame,
-    // Flags for showing retry buttons
-    showStartGameButton,
-    showEndChoiceButton,
+    // Flag for showing end game button
     showEndGameButton,
-    // Loading states
-    isStartingGame,
-    isTransitioning,
+    // Loading state
     isEndingGame,
   };
 }

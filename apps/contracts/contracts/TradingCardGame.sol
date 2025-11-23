@@ -157,9 +157,16 @@ contract TradingCardGame {
         Game storage game = games[gameId];
 
         game.gameId = gameId;
-        game.status = GameStatus.LOBBY;
+        game.status = GameStatus.LOBBY; // Initial status, but phase is determined by timestamps
         game.startTime = block.timestamp;
+        
+        // Calculate ALL deadlines upfront when game is created
         game.lobbyDeadline = block.timestamp + LOBBY_DURATION;
+        // Choice phase starts after lobby ends
+        game.choiceDeadline = block.timestamp + LOBBY_DURATION + CHOICE_DURATION;
+        // Resolution phase starts after choice phase ends
+        game.resolutionDeadline = block.timestamp + LOBBY_DURATION + CHOICE_DURATION + RESOLUTION_DURATION;
+        
         game.players.push(msg.sender);
         
         // Track that this player is now in this game
@@ -229,22 +236,19 @@ contract TradingCardGame {
     }
 
     /**
-     * @notice Start the game - can be called when timer expires
+     * @notice Start the game (DEPRECATED - cards are now generated lazily in commitChoices)
      * @param _gameId The game ID to start
      * @param _useSecureRandomness If true, uses secure randomness (placeholder for Pyth randomness). If false, uses block-based randomness.
-     * @dev Automatically generates cards and transitions to CHOICE phase
+     * @dev This function is kept for backwards compatibility but does nothing
+     *      Cards are automatically generated when first player commits choices
      */
     function startGame(
         uint256 _gameId,
         bool _useSecureRandomness
-    ) external validGame(_gameId) gameStatus(_gameId, GameStatus.LOBBY) {
-        Game storage game = games[_gameId];
-        require(
-            block.timestamp >= game.lobbyDeadline,
-            "Cannot start game yet"
-        );
-
-        _startGame(_gameId, _useSecureRandomness);
+    ) external validGame(_gameId) {
+        // Cards are now generated lazily in commitChoices
+        // This function is a no-op for backwards compatibility
+        // The _useSecureRandomness parameter is ignored
     }
 
     /**
@@ -273,16 +277,33 @@ contract TradingCardGame {
      * @notice Commit player's 3 selected cards
      * @param _gameId The game ID
      * @param _cardNumbers Array of 3 card numbers (4-digit numbers from game.cards)
+     * @dev Automatically generates cards if not already generated (lazy generation)
+     *      Validates that we're in CHOICE phase based on timestamps
      */
     function commitChoices(
         uint256 _gameId,
         uint256[3] memory _cardNumbers
-    ) external validGame(_gameId) gameStatus(_gameId, GameStatus.CHOICE) {
+    ) external validGame(_gameId) {
         Game storage game = games[_gameId];
+        
+        // Validate we're in CHOICE phase based on timestamps
         require(
-            block.timestamp <= game.choiceDeadline,
+            block.timestamp >= game.lobbyDeadline,
+            "Lobby phase not ended yet"
+        );
+        require(
+            block.timestamp < game.choiceDeadline,
             "Choice deadline passed"
         );
+        
+        // Auto-generate cards if not already generated (lazy generation)
+        if (game.cards.length == 0) {
+            // Generate cards using insecure randomness (can be upgraded later)
+            _generateCards(_gameId, false);
+            game.status = GameStatus.CHOICE; // Update status for consistency
+            emit GameActive(_gameId, game.cards);
+        }
+        
         require(!game.choices[msg.sender].committed, "Already committed");
 
         // Verify player is in the game
@@ -316,40 +337,28 @@ contract TradingCardGame {
         });
 
         emit ChoicesCommitted(_gameId, msg.sender, _cardNumbers);
-
-        // Check if all players have committed or deadline passed
-        // Transition to RESOLUTION phase
-        bool allCommitted = true;
-        for (uint256 i = 0; i < game.players.length; i++) {
-            if (!game.choices[game.players[i]].committed) {
-                allCommitted = false;
-                break;
-            }
-        }
-
-        if (allCommitted || block.timestamp >= game.choiceDeadline) {
-            game.status = GameStatus.RESOLUTION;
-            game.resolutionDeadline = block.timestamp + RESOLUTION_DURATION;
+        
+        // Update status to CHOICE if not already set (for consistency)
+        if (game.status != GameStatus.CHOICE && game.status != GameStatus.RESOLUTION) {
+            game.status = GameStatus.CHOICE;
         }
     }
 
     /**
-     * @notice Transition game from CHOICE to RESOLUTION when deadline passes
-     * @param _gameId The game ID
-     * @dev Can be called by anyone when choice deadline has passed
-     *      This ensures games progress even if no one commits
+     * @notice Transition game from CHOICE to RESOLUTION (DEPRECATED - phase is now timestamp-based)
+     * @dev This function is kept for backwards compatibility but does nothing
+     *      Phase transitions are now automatic based on timestamps
      */
     function transitionToResolution(
         uint256 _gameId
-    ) external validGame(_gameId) gameStatus(_gameId, GameStatus.CHOICE) {
+    ) external validGame(_gameId) {
+        // Phase is now determined by timestamps, not explicit transitions
+        // This function is a no-op for backwards compatibility
         Game storage game = games[_gameId];
-        require(
-            block.timestamp >= game.choiceDeadline,
-            "Choice deadline not reached"
-        );
-
-        game.status = GameStatus.RESOLUTION;
-        game.resolutionDeadline = block.timestamp + RESOLUTION_DURATION;
+        // Update status for consistency if we're past choice deadline
+        if (block.timestamp >= game.choiceDeadline && game.status != GameStatus.ENDED) {
+            game.status = GameStatus.RESOLUTION;
+        }
     }
 
     /**
@@ -392,12 +401,22 @@ contract TradingCardGame {
      * @param _gameId The game ID
      * @dev Can be called by anyone after resolution deadline. Typically called by keeper bot/cron
      */
-    function endGame(uint256 _gameId) external validGame(_gameId) gameStatus(_gameId, GameStatus.RESOLUTION) {
+    function endGame(uint256 _gameId) external validGame(_gameId) {
         Game storage game = games[_gameId];
+        
+        // Validate we're past resolution deadline (timestamp-based validation)
         require(
             block.timestamp >= game.resolutionDeadline,
             "Resolution deadline not reached"
         );
+        
+        // Update status to RESOLUTION if not already set (for consistency)
+        if (game.status != GameStatus.RESOLUTION && game.status != GameStatus.ENDED) {
+            game.status = GameStatus.RESOLUTION;
+        }
+        
+        // Prevent calling endGame multiple times
+        require(game.status != GameStatus.ENDED, "Game already ended");
 
         // Resolve all predictions and calculate scores
         // For each player, check their selected cards and award points
@@ -518,6 +537,35 @@ contract TradingCardGame {
     }
 
     /**
+     * @notice Get the current phase of a game based on timestamps
+     * @param _gameId The game ID
+     * @return phase The current phase (LOBBY, CHOICE, RESOLUTION, or ENDED)
+     * @dev Phase is determined by comparing current time to deadlines, not by status field
+     */
+    function getCurrentPhase(uint256 _gameId) public view validGame(_gameId) returns (GameStatus phase) {
+        Game storage game = games[_gameId];
+        
+        // If game is explicitly ENDED, return ENDED
+        if (game.status == GameStatus.ENDED) {
+            return GameStatus.ENDED;
+        }
+        
+        uint256 currentTime = block.timestamp;
+        
+        // Determine phase based on timestamps
+        if (currentTime < game.lobbyDeadline) {
+            return GameStatus.LOBBY;
+        } else if (currentTime < game.choiceDeadline) {
+            return GameStatus.CHOICE;
+        } else if (currentTime < game.resolutionDeadline) {
+            return GameStatus.RESOLUTION;
+        } else {
+            // Resolution deadline passed, but game not ended yet
+            return GameStatus.RESOLUTION; // Still in resolution until endGame is called
+        }
+    }
+
+    /**
      * @notice Get the next game ID that will be assigned
      * @return The next game ID
      */
@@ -528,13 +576,14 @@ contract TradingCardGame {
     /**
      * @notice Get current game state
      * @param _gameId The game ID
-     * @return status Game status
+     * @return status Current phase (computed from timestamps)
      * @return startTime Game start timestamp
      * @return lobbyDeadline Lobby deadline timestamp
      * @return choiceDeadline Choice deadline timestamp
      * @return resolutionDeadline Resolution deadline timestamp
      * @return playerCount Number of players
      * @return cardCount Number of cards generated
+     * @dev Returns the computed phase based on timestamps, not the stored status
      */
     function getGameState(
         uint256 _gameId
@@ -553,8 +602,9 @@ contract TradingCardGame {
         )
     {
         Game storage game = games[_gameId];
+        // Return computed phase based on timestamps
         return (
-            game.status,
+            getCurrentPhase(_gameId),
             game.startTime,
             game.lobbyDeadline,
             game.choiceDeadline,
