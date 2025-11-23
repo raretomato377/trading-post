@@ -92,6 +92,10 @@ export default function Home() {
   
   // State to track if we're showing results (to stop polling)
   const [showingResults, setShowingResults] = useState(false);
+  
+  // Track the last known game state to prevent flickering
+  // Once we've seen a gameState, keep it until we explicitly leave the game
+  const [lastKnownGameState, setLastKnownGameState] = useState<typeof gameState>(undefined);
 
   // Determine which gameId to use: current active game, or ended game if we're showing results
   const gameIdForState = showingResults && endedGameId ? endedGameId : currentGameId;
@@ -100,6 +104,17 @@ export default function Home() {
   // Don't poll when showing results
   const { gameState, isLoading: isLoadingGameState } = useGameState(showingResults ? undefined : gameIdForState);
   
+  // Track last known game state to prevent flickering
+  useEffect(() => {
+    if (gameState) {
+      setLastKnownGameState(gameState);
+    } else if (currentGameId === undefined || currentGameId === 0n) {
+      // Only clear lastKnownGameState if we truly have no active game
+      setLastKnownGameState(undefined);
+    }
+    // Otherwise, keep the last known state to prevent flickering
+  }, [gameState, currentGameId]);
+  
   // Debug: Log game state fetching
   useEffect(() => {
     console.log('🎮 [Page] Game state fetch:', {
@@ -107,8 +122,9 @@ export default function Home() {
       isLoadingGameState,
       gameStateStatus: gameState?.status,
       hasGameState: !!gameState,
+      lastKnownStatus: lastKnownGameState?.status,
     });
-  }, [currentGameId, isLoadingGameState, gameState?.status]);
+  }, [currentGameId, isLoadingGameState, gameState?.status, lastKnownGameState?.status]);
 
   // Extract user data from context
   const user = context?.user;
@@ -126,35 +142,49 @@ export default function Home() {
   
   const hasActiveGame = activeGameId !== undefined && activeGameId > 0n; // Player is in a game
   
-  // Only show lobby if player has NO active game at all AND we're not showing results
-  // Also check that we don't have a gameState (to prevent flickering during polling)
-  // If we have a gameState, we're definitely in a game, so don't show lobby
-  const showLobby = !hasActiveGame && !isCheckingActiveGame && !showingResults && !endedGameId && !gameState;
+  // Use gameState if available, otherwise fall back to lastKnownGameState to prevent flickering
+  const effectiveGameState = gameState || lastKnownGameState;
+  
+  // Determine if we're in a game based on multiple signals
+  // We're in a game if:
+  // 1. We have an activeGameId, OR
+  // 2. We have a gameState (current or last known) that's not ENDED, OR
+  // 3. We're currently checking for an active game (don't show lobby during check)
+  const isInGame = hasActiveGame || 
+                   (effectiveGameState && effectiveGameState.status !== GameStatus.ENDED) || 
+                   isCheckingActiveGame;
+  
+  // Only show lobby if:
+  // 1. We're NOT in a game (no activeGameId, no gameState, not checking)
+  // 2. We're NOT showing results
+  // 3. We don't have an ended game ID
+  const showLobby = !isInGame && !showingResults && !endedGameId;
+  
   // Show game if:
-  // 1. Player has an active game that's not ended, OR
-  // 2. We have a gameState (even if activeGameId is temporarily undefined during polling)
-  // Don't show game if we're showing results
-  const showGame = (hasActiveGame || (gameState && gameState.status !== GameStatus.ENDED)) && !showingResults && gameState?.status !== GameStatus.ENDED;
+  // 1. We're in a game (has activeGameId or gameState), AND
+  // 2. Game is not ENDED, AND
+  // 3. We're not showing results
+  const showGame = isInGame && !showingResults && effectiveGameState?.status !== GameStatus.ENDED;
   // Show results if:
-  // 1. Player's game has ended (hasActiveGame && gameState?.status === ENDED), OR
+  // 1. Player's game has ended (hasActiveGame && effectiveGameState?.status === ENDED), OR
   // 2. We have an ended game ID stored (persists even after playerActiveGame is cleared), OR
   // 3. We're explicitly showing results (showingResults flag)
   // Once showingResults is true, keep showing results until user goes back
   const showResults = showingResults || 
-                      (hasActiveGame && gameState?.status === GameStatus.ENDED) || 
+                      (hasActiveGame && effectiveGameState?.status === GameStatus.ENDED) || 
                       (endedGameId !== undefined);
   
   // Track when a game ends so we can continue showing results even after playerActiveGame is cleared
   // Once showingResults is true, keep it true until user explicitly goes back
   useEffect(() => {
-    if (gameState?.status === GameStatus.ENDED && gameIdForState) {
+    if (effectiveGameState?.status === GameStatus.ENDED && gameIdForState) {
       // Store the ended game ID so we can continue showing results
       setEndedGameId(gameIdForState);
       setShowingResults(true);
     }
     // Don't clear showingResults automatically - only clear when user clicks back
     // This prevents the results page from disappearing
-  }, [gameState?.status, gameIdForState]);
+  }, [effectiveGameState?.status, gameIdForState]);
   
   // Handle back from results - clear the showing results state and refresh
   const handleBackFromResults = () => {
