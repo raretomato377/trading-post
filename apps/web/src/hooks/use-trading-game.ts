@@ -69,12 +69,9 @@ export function useCreateGame() {
     console.log('🎮 [createGame] Current Chain ID:', chainId);
     console.log('🎮 [createGame] Wallet address:', address);
     
-    // Check if wallet is on the correct chain
-    if (chainId !== CELO_MAINNET_CHAIN_ID) {
-      const errorMsg = `Wallet is on wrong network. Current: ${chainId}, Expected: ${CELO_MAINNET_CHAIN_ID}. Please switch to Celo Mainnet.`;
-      console.error('🎮 [createGame]', errorMsg);
-      throw new Error(errorMsg);
-    }
+    // Note: We don't check chainId here because Wagmi will handle chain switching
+    // when chainId is specified in writeContract. The Farcaster connector
+    // may not support getChainId, so we rely on Wagmi's built-in chain switching.
     
     try {
       // Wagmi will automatically prompt for chain switch if needed when chainId is specified

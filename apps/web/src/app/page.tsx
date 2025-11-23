@@ -19,7 +19,28 @@ export default function Home() {
   }, []);
 
   // Wallet connection hooks
-  const { address, isConnected, isConnecting } = useAccount();
+  // Note: useAccount might throw if connector doesn't support getChainId
+  // We'll handle this gracefully
+  let accountData: { address?: `0x${string}`; isConnected: boolean; isConnecting: boolean } = {
+    isConnected: false,
+    isConnecting: false,
+  };
+  try {
+    const account = useAccount();
+    accountData = {
+      address: account.address,
+      isConnected: account.isConnected,
+      isConnecting: account.isConnecting,
+    };
+  } catch (error: any) {
+    // If getChainId error, log it but continue
+    if (error?.message?.includes('getChainId')) {
+      console.warn('⚠️ Connector getChainId error (non-fatal):', error);
+    } else {
+      throw error; // Re-throw other errors
+    }
+  }
+  const { address, isConnected, isConnecting } = accountData;
   const { connect, connectors } = useConnect();
   const hasAttemptedConnectRef = useRef(false);
 

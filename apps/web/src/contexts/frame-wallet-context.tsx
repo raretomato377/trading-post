@@ -8,7 +8,7 @@ import { celo, celoAlfajores } from "wagmi/chains";
 
 const config = createConfig({
   chains: [celo, celoAlfajores], // Celo Mainnet (42220) and Alfajores testnet
-  connectors: [farcasterMiniApp()],
+  connectors: [farcasterMiniApp()], // Farcaster connector doesn't accept arguments
   transports: {
     [celo.id]: http('/api/rpc'), // Use local Next.js API proxy to avoid CORS
     [celoAlfajores.id]: http(),
